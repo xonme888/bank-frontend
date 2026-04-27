@@ -10,28 +10,34 @@
 // 화면 1 (Home) 이 두 도메인 카드 리스트에 공통으로 사용.
 export type AccountState =
   | "ACTIVE"
-  | "EDD_PENDING"
+  | "PENDING"                    // 백엔드 정합 — 가입 진행 중 (KYC/약관)
+  | "PENDING_EDD_APPROVAL"       // 백엔드 정합 — EDD 심사 대기 (운영 응답에서 이 값)
+  | "EDD_PENDING"                // 화면용 별칭 — 짧은 표기. 응답 매핑 시 변환되거나 그대로
   | "SUSPENDED"
   | "MATURED"
   | "EARLY_TERMINATED"
   | "CLOSED";
 
 export const ACCOUNT_STATE_TOKEN: Record<AccountState, string> = {
-  ACTIVE:           "var(--st-active)",
-  EDD_PENDING:      "var(--st-edd-pending)",
-  SUSPENDED:        "var(--st-suspended)",
-  MATURED:          "var(--st-matured)",
-  EARLY_TERMINATED: "var(--st-early-terminated)",
-  CLOSED:           "var(--st-closed)",
+  ACTIVE:                "var(--st-active)",
+  PENDING:               "var(--st-edd-pending)",
+  PENDING_EDD_APPROVAL:  "var(--st-edd-pending)",
+  EDD_PENDING:           "var(--st-edd-pending)",
+  SUSPENDED:             "var(--st-suspended)",
+  MATURED:               "var(--st-matured)",
+  EARLY_TERMINATED:      "var(--st-early-terminated)",
+  CLOSED:                "var(--st-closed)",
 };
 
 export const ACCOUNT_STATE_LABEL: Record<AccountState, string> = {
-  ACTIVE:           "활성",
-  EDD_PENDING:      "EDD 대기",
-  SUSPENDED:        "정지",
-  MATURED:          "만기",
-  EARLY_TERMINATED: "중도해지",
-  CLOSED:           "해지",
+  ACTIVE:                "활성",
+  PENDING:               "가입 진행",
+  PENDING_EDD_APPROVAL:  "EDD 대기",
+  EDD_PENDING:           "EDD 대기",
+  SUSPENDED:             "정지",
+  MATURED:               "만기",
+  EARLY_TERMINATED:      "중도해지",
+  CLOSED:                "해지",
 };
 
 // ============== TxType 6 ==============

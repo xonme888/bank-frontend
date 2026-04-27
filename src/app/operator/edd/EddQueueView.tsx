@@ -1,11 +1,14 @@
 "use client";
 // EDD 큐 — 좌 리스트 + 우 상세 + 결정 영역.
+//   결정 영역의 "승인 확정" 은 LIVE — POST /api/v1/accounts/{id}/approve-edd
 
 import { useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
 import type { EddQueueItem } from "@/data/operator-fixtures";
+import { api, ApiError } from "@/api/client";
+import { DEMO_OPERATOR_ACTOR } from "@/api/actor";
 
 const REJECT_REASONS = [
   "KYC 보강 요청",
@@ -16,11 +19,17 @@ const REJECT_REASONS = [
 
 type Decision = "APPROVE" | "REJECT";
 
-export function EddQueueView({ items }: { items: EddQueueItem[] }) {
+export function EddQueueView({ items, live = false }: { items: EddQueueItem[]; live?: boolean }) {
   const [activeId, setActiveId] = useState<string>(items[0]?.id ?? "");
   const [decisions, setDecisions] = useState<Record<string, Decision>>({});
 
   const active = items.find((i) => i.id === activeId);
+
+  // EDD-{accountId} 형식에서 accountId 파싱 (LIVE 진입 시 backend approve 호출용)
+  function accountIdOf(itemId: string): number | null {
+    const m = /^EDD-(\d+)$/.exec(itemId);
+    return m ? Number(m[1]) : null;
+  }
 
   return (
     <div className="grid grid-cols-[1fr_440px] gap-3 p-6">
@@ -60,6 +69,8 @@ export function EddQueueView({ items }: { items: EddQueueItem[] }) {
           item={active}
           decision={decisions[active.id]}
           onDecide={(d) => setDecisions({ ...decisions, [active.id]: d })}
+          live={live}
+          accountId={accountIdOf(active.id)}
         />
       ) : (
         <div className="border border-rule-strong bg-paper p-10 text-center text-sm text-ink-3">
@@ -117,11 +128,13 @@ function DecisionBadge({ decision }: { decision: Decision | undefined }) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 function DetailPanel({
-  item, decision, onDecide,
+  item, decision, onDecide, live, accountId,
 }: {
   item: EddQueueItem;
   decision: Decision | undefined;
   onDecide: (d: Decision) => void;
+  live: boolean;
+  accountId: number | null;
 }) {
   return (
     <aside className="border border-rule-strong bg-paper p-5 sticky top-3 self-start">
@@ -151,7 +164,7 @@ function DetailPanel({
 
       <ScoreGauge score={item.riskScore} />
 
-      <DecisionForm onDecide={onDecide} current={decision} />
+      <DecisionForm onDecide={onDecide} current={decision} live={live} accountId={accountId} />
     </aside>
   );
 }
@@ -198,9 +211,35 @@ function ScoreGauge({ score }: { score: number }) {
   );
 }
 
-function DecisionForm({ current, onDecide }: { current: Decision | undefined; onDecide: (d: Decision) => void }) {
+function DecisionForm({ current, onDecide, live, accountId }: {
+  current: Decision | undefined;
+  onDecide: (d: Decision) => void;
+  live: boolean;
+  accountId: number | null;
+}) {
   const [reason, setReason] = useState<string>(REJECT_REASONS[0]);
   const [memo, setMemo] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<{ code: string; status: number } | null>(null);
+  const [submitOk, setSubmitOk] = useState(false);
+
+  async function commit() {
+    if (current !== "APPROVE") return;
+    if (!live || accountId == null) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await api.post(`/api/v1/accounts/${accountId}/approve-edd`, {
+        approvalReason: memo || "OPERATOR 승인 — 위험점수 임계 검토 완료",
+      }, { actor: DEMO_OPERATOR_ACTOR });
+      setSubmitOk(true);
+    } catch (e) {
+      if (e instanceof ApiError) setSubmitError({ code: e.code, status: e.status });
+      else setSubmitError({ code: "NETWORK_ERROR", status: 0 });
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <div className="border-t border-dashed border-rule mt-4 pt-4">
@@ -255,8 +294,27 @@ function DecisionForm({ current, onDecide }: { current: Decision | undefined; on
         <div className="font-mono text-[10px] text-ink-3 text-right tnum mt-1">{memo.length}/200</div>
       </div>
 
-      <button className="w-full mt-3 bg-ink text-paper py-3 font-serif text-sm">
-        결정 확정 (감사로그 기록)
+      {submitError && (
+        <div className="mt-3 border-l-2 bg-paper p-2.5" style={{ borderColor: "var(--st-suspended)" }}>
+          <div className="font-mono text-[10px] uppercase tracking-[0.04em]" style={{ color: "var(--st-suspended)" }}>
+            ✕ {submitError.status} {submitError.code}
+          </div>
+        </div>
+      )}
+      {submitOk && (
+        <div className="mt-3 border-l-2 bg-paper p-2.5" style={{ borderColor: "var(--tx-deposit)" }}>
+          <div className="font-mono text-[10px] uppercase tracking-[0.04em]" style={{ color: "var(--tx-deposit)" }}>
+            ✓ 200 OK · LIVE · approve-edd 처리 완료
+          </div>
+          <div className="text-[11px] text-ink-2 mt-1">계좌 상태가 ACTIVE 로 전이되고 감사 로그 1건이 기록됨.</div>
+        </div>
+      )}
+      <button
+        onClick={commit}
+        disabled={current !== "APPROVE" || !live || submitting || submitOk}
+        className="w-full mt-3 bg-ink text-paper py-3 font-serif text-sm disabled:bg-ink-3"
+      >
+        {submitting ? "처리 중…" : submitOk ? "처리 완료" : current === "APPROVE" && live ? "결정 확정 (LIVE 감사로그 기록)" : "결정 확정 (감사로그 기록)"}
       </button>
       <Link
         href={"/operator/customer-360" as Route}
