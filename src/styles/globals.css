@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* paper / ink */
+  --paper: #faf8f3;
+  --paper-2: #f4f1ea;
+  --ink: #1a1a1a;
+  --ink-2: #4a4a4a;
+  --ink-3: #8a8a85;
+  --rule: #d8d3c7;
+  --rule-strong: #b8b3a7;
+  --accent: #2d4a3e;
+
+  /* tx 6-type */
+  --tx-deposit: #3d6b54;
+  --tx-withdraw: #8b4543;
+  --tx-transfer-out: #6b4a8b;
+  --tx-transfer-in: #4a6b8b;
+  --tx-fee: #8b7b4a;
+  --tx-interest: #4a8b8b;
+
+  /* account-state 6 — equal-luminance hue ramp */
+  --st-active: oklch(0.55 0.08 145);
+  --st-dormant: oklch(0.55 0.04 80);
+  --st-frozen: oklch(0.55 0.08 240);
+  --st-edd-pending: oklch(0.55 0.10 60);
+  --st-edd-rejected: oklch(0.55 0.12 25);
+  --st-closed: oklch(0.55 0.0 0);
+}
+
+html, body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans, Inter), system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+.tnum { font-variant-numeric: tabular-nums; }
