@@ -19,3 +19,6 @@ playwright/.cache/
 
 # OpenAPI 자동 생성 — npm run openapi:gen 으로 환경별 갱신
 src/api/schema.d.ts
+
+# git filter-repo 이전 history 백업 (개인 안전망 — 추후 삭제)
+.git-bundle-backup
