@@ -6,6 +6,8 @@
 
 import { DeskShell } from "@/components/shells/DeskShell";
 import { PageEyebrow } from "@/components/chrome/PageEyebrow";
+import { BackendBanner } from "@/components/chrome/BackendBanner";
+import { minutesSince } from "@/lib/format";
 import { EDD_QUEUE, type EddQueueItem } from "@/data/operator-fixtures";
 import { EddQueueView } from "./EddQueueView";
 import { api, ApiError } from "@/api/client";
@@ -50,10 +52,6 @@ async function loadQueue(): Promise<{ items: EddQueueItem[]; live: boolean; reas
   }
 }
 
-function minutesSince(iso: string): number {
-  return Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
-}
-
 export default async function Page() {
   const { items, live, reason } = await loadQueue();
   const NAV = [
@@ -70,12 +68,11 @@ export default async function Page() {
       </div>
       <DeskShell route="GET /api/v1/accounts?status=PENDING_EDD_APPROVAL" traceId="trace-EDD-Q01" nav={NAV}>
         {!live && reason && (
-          <div className="m-6 mb-0 border-l-2 border-st-suspended bg-paper p-3">
-            <div className="font-mono text-[10px] text-ink-3 uppercase tracking-[0.04em] mb-0.5">
-              {reason.includes("비어있음") ? "백엔드 큐 비어있음 · fixture 표시" : "백엔드 미연결 · fixture 표시"}
-            </div>
-            <pre className="font-mono text-[10px] text-ink-3">{reason}</pre>
-          </div>
+          <BackendBanner
+            reason={reason}
+            message={reason.includes("비어있음") ? "백엔드 큐 비어있음 · fixture 표시" : "백엔드 미연결 · fixture 표시"}
+            className="m-6 mb-0"
+          />
         )}
         <EddQueueView items={items} live={live} />
       </DeskShell>

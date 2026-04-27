@@ -4,6 +4,7 @@
 // 응답 TransactionsResponse 의 amount/balanceBefore/balanceAfter 는 PiiMasker 마스킹 string.
 
 import { PageEyebrow } from "@/components/chrome/PageEyebrow";
+import { BackendBanner } from "@/components/chrome/BackendBanner";
 import { HistoryView } from "./HistoryView";
 import { api, ApiError } from "@/api/client";
 import type { TxRow } from "@/data/transactions-fixture";
@@ -92,14 +93,7 @@ export default async function Page({ searchParams }: { searchParams: SearchParam
           백엔드 6-value TransactionType 그대로 — 입금·출금·이체출금·이체입금·만기 지급·중도해지 지급.
         </p>
 
-        {usingFixture && (
-          <div className="border-l-2 border-st-suspended bg-paper p-3 mb-4">
-            <div className="font-mono text-[10px] uppercase tracking-[0.04em] text-ink-3 mb-0.5">
-              백엔드 미연결 · fixture 표시
-            </div>
-            <pre className="font-mono text-[10px] text-ink-3">{reason}</pre>
-          </div>
-        )}
+        {usingFixture && reason && <BackendBanner reason={reason} className="mb-4" />}
 
         <HistoryView
           rows={rows ?? (await fixtureFallback())}

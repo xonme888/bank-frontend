@@ -7,6 +7,8 @@
 import { DeskShell } from "@/components/shells/DeskShell";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
 import { PageEyebrow } from "@/components/chrome/PageEyebrow";
+import { BackendBanner } from "@/components/chrome/BackendBanner";
+import { SourceBadge } from "@/components/primitives/SourceBadge";
 import { SAMPLE_AUDIT_DIFF, type AuditDiff } from "@/data/operator-fixtures";
 import { DiffViewer } from "./DiffViewer";
 import { api, ApiError } from "@/api/client";
@@ -109,12 +111,7 @@ export default async function Page() {
       <DeskShell route={`GET /api/v1/audit-logs/customer/recent`} traceId={diff.traceId} nav={NAV}>
         <div className="p-6 max-w-[1280px]">
           {!live && reason && (
-            <div className="border-l-2 border-st-suspended bg-paper p-3 mb-3">
-              <div className="font-mono text-[10px] text-ink-3 uppercase tracking-[0.04em] mb-0.5">
-                백엔드 미연결 또는 데이터 없음 · fixture 사용
-              </div>
-              <pre className="font-mono text-[10px] text-ink-3">{reason}</pre>
-            </div>
+            <BackendBanner reason={reason} message="백엔드 미연결 또는 데이터 없음 · fixture 사용" />
           )}
 
           <Header diff={diff} live={live} />
@@ -134,15 +131,7 @@ function Header({ diff, live }: { diff: AuditDiff; live: boolean }) {
       <div>
         <div className="flex items-center gap-2 mb-1">
           <Eyebrow>감사 이벤트 · {diff.traceId.slice(0, 16)}{diff.traceId.length > 16 ? "…" : ""}</Eyebrow>
-          <span
-            className="font-mono text-[9px] tracking-[0.06em] uppercase px-1 py-px border"
-            style={{
-              color: live ? "var(--accent)" : "var(--ink-3)",
-              borderColor: live ? "var(--accent)" : "var(--ink-3)",
-            }}
-          >
-            {live ? "real" : "demo"}
-          </span>
+          <SourceBadge live={live} />
         </div>
         <div className="font-serif text-2xl font-medium leading-tight">
           {diff.method} <code className="font-mono text-xl ml-1">{diff.path}</code>

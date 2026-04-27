@@ -11,7 +11,9 @@
 import { DeskShell } from "@/components/shells/DeskShell";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
 import { PageEyebrow } from "@/components/chrome/PageEyebrow";
+import { BackendBanner } from "@/components/chrome/BackendBanner";
 import { StatusBadge } from "@/components/primitives/StatusBadge";
+import { SourceBadge } from "@/components/primitives/SourceBadge";
 import {
   CUSTOMER_360,
   CUSTOMER_ACCOUNT_TREE,
@@ -79,12 +81,7 @@ export default async function Page() {
           <CustomerHeader />
 
           {!live && reason && (
-            <div className="border-l-2 border-st-suspended bg-paper p-3 mb-3">
-              <div className="font-mono text-[10px] text-ink-3 uppercase tracking-[0.04em] mb-0.5">
-                백엔드 미연결 · 프로필도 fixture 사용
-              </div>
-              <pre className="font-mono text-[10px] text-ink-3">{reason}</pre>
-            </div>
+            <BackendBanner reason={reason} message="백엔드 미연결 · 프로필도 fixture 사용" />
           )}
 
           <div className="grid grid-cols-[280px_320px_1fr] gap-3 mb-4">
@@ -113,15 +110,7 @@ function ProfileColumn({ profile, live }: { profile: CustomerProfile; live: bool
     <section className="border border-rule-strong bg-paper p-4">
       <div className="flex items-center justify-between mb-3">
         <Eyebrow>프로필 · #{profile.id}</Eyebrow>
-        <span
-          className="font-mono text-[9px] tracking-[0.06em] uppercase px-1 py-px border"
-          style={{
-            color: live ? "var(--accent)" : "var(--ink-3)",
-            borderColor: live ? "var(--accent)" : "var(--ink-3)",
-          }}
-        >
-          {live ? "real" : "demo"}
-        </span>
+        <SourceBadge live={live} />
       </div>
       <Field label="이름" value={profile.nameMasked} />
       <Field label="전화" value={profile.phoneMasked} mono />

@@ -14,7 +14,9 @@ import { api, ApiError } from "@/api/client";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
 import { PageEyebrow } from "@/components/chrome/PageEyebrow";
 import { StatusBadge } from "@/components/primitives/StatusBadge";
+import { SourceBadge } from "@/components/primitives/SourceBadge";
 import { Donut } from "@/components/primitives/Donut";
+import { daysUntil } from "@/lib/format";
 import {
   FIXTURE_DDA_CARDS,
   FIXTURE_TIME_DEPOSITS,
@@ -189,7 +191,7 @@ function DdaList({ cards, lastTx }: { cards: DashboardCard[]; lastTx: string | n
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <SourceBadge isFixture={c.isFixture} />
+                <SourceBadge live={!c.isFixture} />
                 <StatusBadge state={c.status} />
               </div>
             </div>
@@ -231,7 +233,7 @@ function TimeDepositList({ cards }: { cards: TimeDepositCard[] }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <SourceBadge isFixture={c.isFixture} />
+                  <SourceBadge live={!c.isFixture} />
                   <StatusBadge state={c.status} />
                 </div>
               </div>
@@ -261,12 +263,6 @@ function TimeDepositList({ cards }: { cards: TimeDepositCard[] }) {
   );
 }
 
-function daysUntil(iso: string): number {
-  const target = new Date(iso).getTime();
-  const now = Date.now();
-  return Math.max(0, Math.ceil((target - now) / 86_400_000));
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // 알림 영역
 function Notifications({ items }: { items: Notification[] }) {
@@ -287,21 +283,7 @@ function Notifications({ items }: { items: Notification[] }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 헬퍼
-function SourceBadge({ isFixture }: { isFixture?: boolean }) {
-  return (
-    <span
-      className="font-mono text-[9px] tracking-[0.06em] uppercase px-1 py-px border"
-      style={{
-        color: isFixture ? "var(--ink-3)" : "var(--accent)",
-        borderColor: isFixture ? "var(--ink-3)" : "var(--accent)",
-      }}
-    >
-      {isFixture ? "demo" : "real"}
-    </span>
-  );
-}
-
+// 헬퍼 — home 전용 두 줄 BackendBanner (다른 화면은 chrome/BackendBanner 단일 라인 사용)
 function BackendBanner({ reason }: { reason: string }) {
   return (
     <div className="border-l-2 border-st-suspended bg-paper p-3 mb-4">
