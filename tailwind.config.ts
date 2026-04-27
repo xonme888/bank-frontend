@@ -19,19 +19,19 @@ const config: Config = {
           strong: "var(--rule-strong)",
         },
         accent: "var(--accent)",
-        // tx-type 6
+        // tx-type 6 — 백엔드 TransactionType 정합
         "tx-deposit": "var(--tx-deposit)",
         "tx-withdraw": "var(--tx-withdraw)",
         "tx-transfer-out": "var(--tx-transfer-out)",
         "tx-transfer-in": "var(--tx-transfer-in)",
-        "tx-fee": "var(--tx-fee)",
-        "tx-interest": "var(--tx-interest)",
-        // account-state 6
+        "tx-maturity-payout": "var(--tx-maturity-payout)",
+        "tx-early-termination-payout": "var(--tx-early-termination-payout)",
+        // account-state 6 — DDA 4 + 정기예금 2
         "st-active": "var(--st-active)",
-        "st-dormant": "var(--st-dormant)",
-        "st-frozen": "var(--st-frozen)",
         "st-edd-pending": "var(--st-edd-pending)",
-        "st-edd-rejected": "var(--st-edd-rejected)",
+        "st-suspended": "var(--st-suspended)",
+        "st-matured": "var(--st-matured)",
+        "st-early-terminated": "var(--st-early-terminated)",
         "st-closed": "var(--st-closed)",
       },
       fontFamily: {

@@ -13,21 +13,22 @@
   --rule-strong: #b8b3a7;
   --accent: #2d4a3e;
 
-  /* tx 6-type */
-  --tx-deposit: #3d6b54;
-  --tx-withdraw: #8b4543;
-  --tx-transfer-out: #6b4a8b;
-  --tx-transfer-in: #4a6b8b;
-  --tx-fee: #8b7b4a;
-  --tx-interest: #4a8b8b;
+  /* tx 6-type — 백엔드 TransactionType 정합 */
+  --tx-deposit: #3d6b54;                    /* 녹 — 입금 */
+  --tx-withdraw: #8b4543;                   /* 적 — 출금 */
+  --tx-transfer-out: #6b4a8b;               /* 보라 — 이체 출금 */
+  --tx-transfer-in: #4a6b8b;                /* 파 — 이체 입금 */
+  --tx-maturity-payout: #8b7b4a;            /* 골드 — 만기 지급 */
+  --tx-early-termination-payout: #6b6b6b;   /* 회 — 중도해지 지급 */
 
-  /* account-state 6 — equal-luminance hue ramp */
-  --st-active: oklch(0.55 0.08 145);
-  --st-dormant: oklch(0.55 0.04 80);
-  --st-frozen: oklch(0.55 0.08 240);
-  --st-edd-pending: oklch(0.55 0.10 60);
-  --st-edd-rejected: oklch(0.55 0.12 25);
-  --st-closed: oklch(0.55 0.0 0);
+  /* account-state 6 — equal-luminance hue ramp.
+     DDA 4(ACTIVE/EDD_PENDING/SUSPENDED/CLOSED) + 정기예금 2(MATURED/EARLY_TERMINATED) */
+  --st-active:           oklch(0.55 0.08 145);   /* 녹 */
+  --st-edd-pending:      oklch(0.55 0.10 60);    /* 노랑 */
+  --st-suspended:        oklch(0.55 0.12 25);    /* 적 */
+  --st-matured:          oklch(0.55 0.08 240);   /* 파 */
+  --st-early-terminated: oklch(0.55 0.06 300);   /* 보라 */
+  --st-closed:           oklch(0.55 0.0 0);      /* 회 */
 }
 
 html, body {

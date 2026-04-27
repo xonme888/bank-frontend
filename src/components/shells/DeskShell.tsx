@@ -21,7 +21,7 @@ export function DeskShell({ route, traceId, nav, operator = "컴플라이언스 
             xbank<span className="text-ink-3">/ops</span>
           </div>
           <div className="font-mono text-[9px] tracking-[0.06em] text-ink-3 mt-0.5">
-            BACKOFFICE · TELLER
+            BACKOFFICE · BRANCH
           </div>
         </div>
         <nav className="py-3">

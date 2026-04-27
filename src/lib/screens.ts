@@ -40,6 +40,6 @@ export const SCREENS: Screen[] = [
   { id: "report",  n: "12", title: "감사 리포트",         desc: "actor × channel × 도메인 집계.",          tags: ["DESKTOP","AUDIT"],group: "Ops", route: "/ops/report" },
 
   // DESIGN_SYSTEM
-  { id: "errors", n: "13", title: "ErrorCode 카탈로그",   desc: "29 코드, 카테고리/검색 필터.",             tags: ["DS","ERR"],     group: "DESIGN_SYSTEM", route: "/system/errors" },
+  { id: "errors", n: "13", title: "ErrorCode 카탈로그",   desc: "51 코드, 카테고리/검색 필터.",             tags: ["DS","ERR"],     group: "DESIGN_SYSTEM", route: "/system/errors" },
   { id: "gauge",  n: "14", title: "한도 게이지 컴포넌트", desc: "variants · usage · props.",                tags: ["DS","CMP"],     group: "DESIGN_SYSTEM", route: "/system/gauge" },
 ];
