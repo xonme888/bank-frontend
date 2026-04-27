@@ -17,3 +17,10 @@ export const DEMO_ACTOR: ActorContext = {
   id: "1",
   channel: "MOBILE",
 };
+
+/** OPERATOR 백오피스 화면용 actor — customer-360, edd, audit-diff 등에서 사용. */
+export const DEMO_OPERATOR_ACTOR: ActorContext = {
+  type: "OPERATOR",
+  id: "OP-2103",
+  channel: "BRANCH",
+};
