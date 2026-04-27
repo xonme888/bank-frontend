@@ -23,28 +23,29 @@ if [ "$HAS_GIFSKI$HAS_FFMPEG" = "00" ]; then
 fi
 
 CONVERTED=0
+# Playwright 디렉토리 패턴 예: "demo-recording.ts-fds-rejection-demo".
+# 앞뒤 토막 제거 후 docs/demo-<title>.gif.
 while IFS= read -r -d '' webm; do
-  # 디렉토리명: test-results/demo-recording-<title>-demo/video.webm
   dir=$(dirname "$webm")
   base=$(basename "$dir")
-  # base 예: "demo-recording-fds-rejection-demo"
-  # → title 추출: 앞 "demo-recording-" 와 뒤 "-demo" 제거
-  title=${base#demo-recording-}
-  title=${title%-demo}
-  # 일부 변형 (재실행 시 -1, -retry1 등) 정리
-  title=${title%-retry*}
+  title=${base#demo-recording.ts-}     # 앞 "demo-recording.ts-" 제거 (점 포함)
+  title=${title#demo-recording-}        # 점 없는 변형도 호환
+  title=${title%-demo}                  # 뒤 "-demo" 제거
+  title=${title%-retry*}                # 재실행 retry suffix 제거
 
   out="docs/demo-${title}.gif"
   echo "→ $title  ($webm → $out)"
 
+  # ffmpeg 의 -nostdin 필수 — 미설정 시 첫 호출이 stdin 의 한 글자를 소비해
+  # 다음 iteration 의 path 첫 글자가 잘리는 hideous 버그 발생.
   if [ "$HAS_GIFSKI" = "1" ] && [ "$HAS_FFMPEG" = "1" ]; then
     tmp=$(mktemp -d)
-    ffmpeg -loglevel error -y -i "$webm" \
+    ffmpeg -nostdin -loglevel error -y -i "$webm" \
       -vf "fps=15,scale=1280:-1:flags=lanczos" "$tmp/frame_%04d.png"
     gifski "$tmp"/frame_*.png -o "$out" --fps 15 --width 1280 --quality 80
     rm -rf "$tmp"
   else
-    ffmpeg -loglevel error -y -i "$webm" \
+    ffmpeg -nostdin -loglevel error -y -i "$webm" \
       -vf "fps=15,scale=1280:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" \
       "$out"
   fi
