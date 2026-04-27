@@ -39,7 +39,7 @@ type AccountResponse = {
 type BalanceResponse = {
   accountId: number;
   accountNumber: string;
-  balance: string;        // PiiMasker.maskAmount 의 마스킹 string
+  balance: number;        // 본인 self-service — 평문 long
   lastTransactionAt: string | null;
 };
 
@@ -57,10 +57,7 @@ async function loadRealCard(): Promise<{ card: RealCard | null; reason?: string;
         alias: "주거래 통장",
         accountNumber: account.accountNumber,
         status: account.status,
-        // 마스킹된 string 은 카드 표시용으로 보존.
-        // 도넛/합산용 number 는 마지막 *** → 000 으로 가정 (PiiMasker 가 마지막 3자리만 마스킹).
-        balance: parseMaskedAmount(balance.balance),
-        balanceMasked: balance.balance,
+        balance: balance.balance,        // 평문 long
       },
       lastTx: balance.lastTransactionAt,
     };
@@ -69,13 +66,6 @@ async function loadRealCard(): Promise<{ card: RealCard | null; reason?: string;
       : e instanceof Error ? e.message : "백엔드 연결 실패";
     return { card: null, reason, lastTx: null };
   }
-}
-
-function parseMaskedAmount(raw: string): number {
-  // PiiMasker.maskAmount 출력 예: "2,450,***" — 마지막 *** 는 000 으로 가정 후 숫자화.
-  // (실제 값은 알 수 없으므로 합산은 근사치. 카드 표시는 balanceMasked 원본 사용.)
-  const normalized = raw.replace(/\*+/g, "000").replace(/[^\d]/g, "");
-  return normalized ? Number(normalized) : 0;
 }
 
 export default async function Page() {
@@ -205,16 +195,9 @@ function DdaList({ cards, lastTx }: { cards: DashboardCard[]; lastTx: string | n
               </div>
             </div>
             <div className="font-sans tnum font-medium text-2xl">
-              {c.balanceMasked ?? c.balance.toLocaleString("ko-KR")}
+              {c.balance.toLocaleString("ko-KR")}
               <span className="text-ink-3 font-normal text-sm ml-1">원</span>
             </div>
-            {!c.isFixture && (
-              <div className="mt-1 font-mono text-[10px] text-ink-3">
-                {c.balanceMasked
-                  ? "PiiMasker 마지막 3자리 마스킹"
-                  : null}
-              </div>
-            )}
             {!c.isFixture && lastTx && (
               <div className="mt-2 font-mono text-[10px] text-ink-3">
                 최근 거래: {new Date(lastTx).toLocaleString("ko-KR")}
