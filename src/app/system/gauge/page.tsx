@@ -3,17 +3,15 @@
 // IA 매핑 (docs/ux/screen-ia.md §화면 14):
 //   ① 컴포넌트 데모 ② 변형 갤러리 ③ 사용 가이드 ④ Props 표
 
-import Link from "next/link";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
+import { PageEyebrow } from "@/components/chrome/PageEyebrow";
 import { GaugeRow } from "@/components/primitives/GaugeRow";
 
 export default function Page() {
   return (
     <div className="bg-paper-2 min-h-[calc(100vh-58px)]">
       <div className="mx-auto max-w-[1200px] p-10 pb-20">
-        <Link href="/" className="font-mono text-[11px] text-ink-3 hover:text-ink">← all screens</Link>
-
-        <Eyebrow className="mt-6 mb-3">SCREEN 14 · DESIGN SYSTEM</Eyebrow>
+        <PageEyebrow screenId="gauge" />
         <h1 className="font-serif text-[40px] leading-[1.1] font-medium tracking-[-0.025em] mb-2">
           Limit gauge
         </h1>

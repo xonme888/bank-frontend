@@ -3,8 +3,7 @@
 // 백엔드 endpoint 가 from/to (LocalDate, ISO) 필수 — 기간 파라미터 변환 후 전달.
 // 응답 TransactionsResponse 의 amount/balanceBefore/balanceAfter 는 PiiMasker 마스킹 string.
 
-import Link from "next/link";
-import { Eyebrow } from "@/components/primitives/Eyebrow";
+import { PageEyebrow } from "@/components/chrome/PageEyebrow";
 import { HistoryView } from "./HistoryView";
 import { api, ApiError } from "@/api/client";
 import type { TxRow } from "@/data/transactions-fixture";
@@ -85,9 +84,7 @@ export default async function Page({ searchParams }: { searchParams: SearchParam
   return (
     <div className="bg-paper-2 min-h-[calc(100vh-58px)]">
       <div className="mx-auto max-w-[640px] p-6 pb-16">
-        <Link href="/" className="font-mono text-[11px] text-ink-3 hover:text-ink">← all screens</Link>
-
-        <Eyebrow className="mt-6 mb-3">SCREEN 04 · CUSTOMER · MOBILE</Eyebrow>
+        <PageEyebrow screenId="history" />
         <h1 className="font-serif text-[40px] leading-[1.1] font-medium tracking-[-0.025em] mb-2">
           거래 내역
         </h1>

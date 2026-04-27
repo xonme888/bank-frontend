@@ -7,6 +7,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
+import { PageEyebrow } from "@/components/chrome/PageEyebrow";
 
 const RECEIPT = {
   productCode: "TDA-12M",
@@ -30,9 +31,7 @@ export default function Page() {
   return (
     <div className="bg-paper-2 min-h-[calc(100vh-58px)]">
       <div className="mx-auto max-w-[640px] p-6 pb-16">
-        <Link href="/" className="font-mono text-[11px] text-ink-3 hover:text-ink">← all screens</Link>
-
-        <Eyebrow className="mt-6 mb-3">SCREEN 06 · CUSTOMER · MOBILE</Eyebrow>
+        <PageEyebrow screenId="receipt" />
         <h1 className="font-serif text-[40px] leading-[1.1] font-medium tracking-[-0.025em] mb-2">
           만기 영수증
         </h1>

@@ -8,9 +8,9 @@
 // LIVE: GET /api/v1/customers/{id} (DEMO_OPERATOR_ACTOR 헤더로 호출).
 // fixture 유지: 백엔드에 "내 계좌 목록" / "감사로그 검색" endpoint 미구현.
 
-import Link from "next/link";
 import { DeskShell } from "@/components/shells/DeskShell";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
+import { PageEyebrow } from "@/components/chrome/PageEyebrow";
 import { StatusBadge } from "@/components/primitives/StatusBadge";
 import {
   CUSTOMER_360,
@@ -72,8 +72,7 @@ export default async function Page() {
   return (
     <>
       <div className="px-10 pt-6 pb-2 max-w-[1100px]">
-        <Link href="/" className="font-mono text-[11px] text-ink-3 hover:text-ink">← all screens</Link>
-        <Eyebrow className="mt-3 mb-1">SCREEN 07 · OPERATOR · DESKTOP</Eyebrow>
+        <PageEyebrow screenId="customer-360" variant="deskshell" />
       </div>
       <DeskShell route={`GET /api/v1/customers/${TARGET_CUSTOMER_ID}`} traceId="trace-360-A12" nav={NAV}>
         <div className="p-8 max-w-[1100px]">

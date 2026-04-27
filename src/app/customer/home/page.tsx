@@ -12,6 +12,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { api, ApiError } from "@/api/client";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
+import { PageEyebrow } from "@/components/chrome/PageEyebrow";
 import { StatusBadge } from "@/components/primitives/StatusBadge";
 import { Donut } from "@/components/primitives/Donut";
 import {
@@ -82,9 +83,7 @@ export default async function Page() {
   return (
     <div className="bg-paper-2 min-h-[calc(100vh-58px)]">
       <div className="mx-auto max-w-[640px] p-6 pb-16">
-        <Link href="/" className="font-mono text-[11px] text-ink-3 hover:text-ink">← all screens</Link>
-
-        <Eyebrow className="mt-6 mb-3">SCREEN 01 · CUSTOMER · MOBILE</Eyebrow>
+        <PageEyebrow screenId="home" />
         <h1 className="font-serif text-[40px] leading-[1.1] font-medium tracking-[-0.025em] mb-6">
           홍**님, 안녕하세요
         </h1>

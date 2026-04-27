@@ -3,9 +3,9 @@
 // IA 매핑 (docs/ux/screen-ia.md §화면 12):
 //   ① 헤더 (기간 + 리포트 타입) ② 요약 카드 ③ actor × channel × 도메인 교차 표 ④ 다운로드
 
-import Link from "next/link";
 import { DeskShell } from "@/components/shells/DeskShell";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
+import { PageEyebrow } from "@/components/chrome/PageEyebrow";
 import { REPORT_SUMMARY, REPORT_TABLE } from "@/data/ops-fixtures";
 
 const NAV = [
@@ -20,8 +20,7 @@ export default function Page() {
   return (
     <>
       <div className="px-10 pt-6 pb-2 max-w-[1280px]">
-        <Link href="/" className="font-mono text-[11px] text-ink-3 hover:text-ink">← all screens</Link>
-        <Eyebrow className="mt-3 mb-1">SCREEN 12 · OPS · DESKTOP</Eyebrow>
+        <PageEyebrow screenId="report" variant="deskshell" />
       </div>
       <DeskShell route="GET /ops/reports/audit" traceId="trace-OPS-RPT" nav={NAV}>
         <div className="p-6 max-w-[1280px]">

@@ -3,9 +3,9 @@
 // IA 매핑 (docs/ux/screen-ia.md §화면 10):
 //   ① KPI 4개 ② 분당 거래량 60-bucket 라인 ③ 채널 분포 도넛 ④ 도메인별 표
 
-import Link from "next/link";
 import { DeskShell } from "@/components/shells/DeskShell";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
+import { PageEyebrow } from "@/components/chrome/PageEyebrow";
 import { Donut } from "@/components/primitives/Donut";
 import {
   KPIS,
@@ -27,8 +27,7 @@ export default function Page() {
   return (
     <>
       <div className="px-10 pt-6 pb-2 max-w-[1280px]">
-        <Link href="/" className="font-mono text-[11px] text-ink-3 hover:text-ink">← all screens</Link>
-        <Eyebrow className="mt-3 mb-1">SCREEN 10 · OPS · DESKTOP</Eyebrow>
+        <PageEyebrow screenId="monitor" variant="deskshell" />
       </div>
       <DeskShell route="GET /ops/dashboard" traceId="trace-OPS-MON" nav={NAV}>
         <div className="p-6 max-w-[1280px]">

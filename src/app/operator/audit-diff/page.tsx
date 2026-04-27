@@ -4,9 +4,9 @@
 //        + GET /api/v1/audit-logs/customer/by-trace/{traceId} (chain)
 // fixture fallback: 백엔드 미연결 시 SAMPLE_AUDIT_DIFF 사용.
 
-import Link from "next/link";
 import { DeskShell } from "@/components/shells/DeskShell";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
+import { PageEyebrow } from "@/components/chrome/PageEyebrow";
 import { SAMPLE_AUDIT_DIFF, type AuditDiff } from "@/data/operator-fixtures";
 import { DiffViewer } from "./DiffViewer";
 import { api, ApiError } from "@/api/client";
@@ -104,8 +104,7 @@ export default async function Page() {
   return (
     <>
       <div className="px-10 pt-6 pb-2 max-w-[1280px]">
-        <Link href="/" className="font-mono text-[11px] text-ink-3 hover:text-ink">← all screens</Link>
-        <Eyebrow className="mt-3 mb-1">SCREEN 09 · OPERATOR · DESKTOP</Eyebrow>
+        <PageEyebrow screenId="audit-diff" variant="deskshell" />
       </div>
       <DeskShell route={`GET /api/v1/audit-logs/customer/recent`} traceId={diff.traceId} nav={NAV}>
         <div className="p-6 max-w-[1280px]">

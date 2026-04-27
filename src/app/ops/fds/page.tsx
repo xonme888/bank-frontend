@@ -7,6 +7,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { DeskShell } from "@/components/shells/DeskShell";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
+import { PageEyebrow } from "@/components/chrome/PageEyebrow";
 import {
   FDS_HEATMAP,
   FDS_REASON_RANKING,
@@ -28,8 +29,7 @@ export default function Page() {
   return (
     <>
       <div className="px-10 pt-6 pb-2 max-w-[1280px]">
-        <Link href="/" className="font-mono text-[11px] text-ink-3 hover:text-ink">← all screens</Link>
-        <Eyebrow className="mt-3 mb-1">SCREEN 11 · OPS · DESKTOP</Eyebrow>
+        <PageEyebrow screenId="fds" variant="deskshell" />
       </div>
       <DeskShell route="GET /ops/fds" traceId="trace-OPS-FDS" nav={NAV}>
         <div className="p-6 max-w-[1280px]">

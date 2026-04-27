@@ -8,8 +8,7 @@
 //
 // URL search param ?scenario= 으로 거부 시나리오 시연 (포트폴리오 토글).
 
-import Link from "next/link";
-import { Eyebrow } from "@/components/primitives/Eyebrow";
+import { PageEyebrow } from "@/components/chrome/PageEyebrow";
 import { WithdrawScreen } from "./WithdrawScreen";
 
 export const dynamic = "force-dynamic";
@@ -20,9 +19,7 @@ export default function Page({ searchParams }: { searchParams: SearchParams }) {
   return (
     <div className="bg-paper-2 min-h-[calc(100vh-58px)]">
       <div className="mx-auto max-w-[640px] p-6 pb-16">
-        <Link href="/" className="font-mono text-[11px] text-ink-3 hover:text-ink">← all screens</Link>
-
-        <Eyebrow className="mt-6 mb-3">SCREEN 02 · CUSTOMER · MOBILE</Eyebrow>
+        <PageEyebrow screenId="withdraw" />
         <h1 className="font-serif text-[40px] leading-[1.1] font-medium tracking-[-0.025em] mb-2">
           출금
         </h1>

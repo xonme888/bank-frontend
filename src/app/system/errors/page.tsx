@@ -6,8 +6,8 @@
 // 데이터: src/data/error-codes.ts (백엔드 ErrorCode.java 와 1:1 정합).
 // 검색 필터링은 클라이언트에서 처리 ("use client" 격리는 SearchableCatalog 컴포넌트만).
 
-import Link from "next/link";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
+import { PageEyebrow } from "@/components/chrome/PageEyebrow";
 import { ERROR_CODES, ERROR_CATEGORY_LABEL, type ErrorCategory, type ErrorEntry } from "@/data/error-codes";
 import { SearchableCatalog } from "./SearchableCatalog";
 
@@ -26,9 +26,7 @@ export default function Page() {
   return (
     <div className="bg-paper-2 min-h-[calc(100vh-58px)]">
       <div className="mx-auto max-w-[1200px] p-10 pb-20">
-        <Link href="/" className="font-mono text-[11px] text-ink-3 hover:text-ink">← all screens</Link>
-
-        <Eyebrow className="mt-6 mb-3">SCREEN 13 · DESIGN SYSTEM</Eyebrow>
+        <PageEyebrow screenId="errors" />
         <h1 className="font-serif text-[40px] leading-[1.1] font-medium tracking-[-0.025em] mb-2">
           Error code catalog
         </h1>

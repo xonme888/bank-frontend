@@ -4,9 +4,8 @@
 // 백엔드 응답을 EddQueueItem 으로 매핑. 위험점수·KYC 결과 등 운영 메타는 fixture 보정
 // (백엔드에 별도 컬럼/검색 endpoint 미구현).
 
-import Link from "next/link";
 import { DeskShell } from "@/components/shells/DeskShell";
-import { Eyebrow } from "@/components/primitives/Eyebrow";
+import { PageEyebrow } from "@/components/chrome/PageEyebrow";
 import { EDD_QUEUE, type EddQueueItem } from "@/data/operator-fixtures";
 import { EddQueueView } from "./EddQueueView";
 import { api, ApiError } from "@/api/client";
@@ -67,8 +66,7 @@ export default async function Page() {
   return (
     <>
       <div className="px-10 pt-6 pb-2 max-w-[1280px]">
-        <Link href="/" className="font-mono text-[11px] text-ink-3 hover:text-ink">← all screens</Link>
-        <Eyebrow className="mt-3 mb-1">SCREEN 08 · OPERATOR · DESKTOP</Eyebrow>
+        <PageEyebrow screenId="edd" variant="deskshell" />
       </div>
       <DeskShell route="GET /api/v1/accounts?status=PENDING_EDD_APPROVAL" traceId="trace-EDD-Q01" nav={NAV}>
         {!live && reason && (
