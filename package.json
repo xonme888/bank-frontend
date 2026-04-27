@@ -9,8 +9,10 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "openapi:gen": "openapi-typescript http://localhost:8080/v3/api-docs -o src/api/schema.d.ts",
-    "test:e2e": "playwright test",
-    "test:e2e:update": "playwright test --update-snapshots"
+    "test:e2e": "playwright test --project=desktop",
+    "test:e2e:update": "playwright test --project=desktop --update-snapshots",
+    "demo:record": "playwright test --project=demo",
+    "demo:gif": "bash scripts/demo-to-gif.sh"
   },
   "dependencies": {
     "next": "^14.2.35",

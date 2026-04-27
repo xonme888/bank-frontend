@@ -1,7 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// xbank-next 16 화면 visual 회귀 + 시나리오 토글 회귀.
-// webServer 옵션이 dev 서버를 자동 기동·종료 — `npx playwright test` 한 줄로 끝.
+// xbank-next 16 화면 visual 회귀 + 시나리오 토글 회귀 + 데모 영상 자동 녹화.
+//
+// 명령:
+//   npm run test:e2e             — 회귀 (32 baseline, project: desktop)
+//   npm run test:e2e:update      — baseline 갱신
+//   npm run demo:record          — 데모 영상 녹화 (project: demo, .webm 산출)
+//   npm run demo:gif             — .webm → .gif 변환 (gifski / ffmpeg)
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
@@ -23,9 +28,27 @@ export default defineConfig({
   },
 
   projects: [
+    // 회귀 (baseline 비교) — 기본
     {
       name: "desktop",
+      testMatch: /.*\.(spec)\.ts$/,
+      testIgnore: /demo-.*\.ts$/,
       use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } },
+    },
+    // 데모 영상 녹화 — 별도 project. test 파일은 demo-* 만.
+    {
+      name: "demo",
+      testMatch: /demo-.*\.ts$/,
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1280, height: 800 },
+        // 모든 동작에 0.2 초 지연 — 녹화에서 이동이 너무 빠르면 시청 어려움.
+        launchOptions: { slowMo: 200 },
+        video: {
+          mode: "on",
+          size: { width: 1280, height: 800 },
+        },
+      },
     },
   ],
 
