@@ -1,5 +1,6 @@
 // 16-화면 인덱스 허브
 import Link from "next/link";
+import type { Route } from "next";
 import { SCREENS, GROUP_INFO, type ScreenGroup } from "@/lib/screens";
 
 const GROUPS: ScreenGroup[] = ["CUSTOMER", "OPERATOR", "Ops", "DESIGN_SYSTEM"];
@@ -40,7 +41,7 @@ export default function HubPage() {
                 {items.map((s) => (
                   <Link
                     key={s.id}
-                    href={s.route}
+                    href={s.route as Route}
                     className="relative flex flex-col gap-2 min-h-[180px] px-[22px] pt-6 pb-[18px] border-r border-b border-rule bg-paper hover:bg-paper-2 transition-colors"
                   >
                     <div className="font-mono text-[11px] tracking-[0.06em] text-ink-3">SCREEN {s.n}</div>

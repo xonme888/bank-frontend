@@ -3,6 +3,7 @@
 // 백엔드가 응답하면 마스킹 계좌번호·잔액·상태 배지를, 그렇지 않으면 안내를 표시.
 
 import Link from "next/link";
+import type { Route } from "next";
 import { api, ApiError } from "@/api/client";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
 import { StatusBadge } from "@/components/primitives/StatusBadge";
@@ -126,7 +127,7 @@ function Disconnected({ reason }: { reason: string }) {
 }
 
 function QuickActions() {
-  const actions = [
+  const actions: ReadonlyArray<{ label: string; href: Route }> = [
     { label: "입금",    href: "/customer/deposit" },
     { label: "출금",    href: "/customer/withdraw" },
     { label: "이체",    href: "/customer/transfer" },
