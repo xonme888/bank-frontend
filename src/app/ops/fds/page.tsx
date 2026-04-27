@@ -4,6 +4,7 @@
 //   ① 헤더 KPI ② 시간대 heatmap (24×7) ③ reasonCode ranking ④ 채널 비교 ⑤ drill-down 표
 
 import Link from "next/link";
+import type { Route } from "next";
 import { DeskShell } from "@/components/shells/DeskShell";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
 import {
@@ -207,14 +208,14 @@ function RecentRejections() {
       <table className="w-full font-mono text-[10px]">
         <thead>
           <tr className="border-b border-rule">
-            {["시각", "계좌", "금액", "reason", "채널", "score"].map((h) => (
+            {["시각", "계좌", "금액", "reason", "채널", "score", ""].map((h) => (
               <th key={h} className="text-left px-3 py-2 font-normal text-ink-3 uppercase tracking-[0.04em]">{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {FDS_REJECTIONS.map((r, i) => (
-            <tr key={i} className="border-b border-rule last:border-b-0 hover:bg-paper-2 cursor-pointer">
+            <tr key={i} className="border-b border-rule last:border-b-0 hover:bg-paper-2">
               <td className="px-3 py-2 tnum text-ink-3">
                 {new Date(r.ts).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" })}
               </td>
@@ -224,6 +225,15 @@ function RecentRejections() {
               <td className="px-3 py-2 text-ink-2">{r.channel}</td>
               <td className="px-3 py-2 tnum" style={{ color: r.score >= 0.85 ? "var(--st-suspended)" : "var(--st-edd-pending)" }}>
                 {r.score.toFixed(2)}
+              </td>
+              <td className="px-3 py-2 text-right">
+                <Link
+                  href={"/operator/audit-diff" as Route}
+                  className="font-mono text-[10px] text-ink-3 hover:text-ink"
+                  title="감사 diff 로 drill-down"
+                >
+                  audit →
+                </Link>
               </td>
             </tr>
           ))}

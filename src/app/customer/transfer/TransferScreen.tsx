@@ -8,6 +8,8 @@
 //  - idem:     IDEMPOTENCY_KEY_REUSED (확인 단계 노란 배너)
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
 
 type Scenario = "none" | "same" | "fds" | "idem";
@@ -356,7 +358,15 @@ function DoneStep({ amount, groupId }: { amount: number; groupId: string }) {
       <div className="font-mono text-[10px] text-ink-3 mb-5 break-all">
         groupId: {groupId}
       </div>
-      <button className="w-full border border-ink py-3 font-serif text-sm">영수증 다운로드</button>
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <Link href={"/customer/history?type=TRANSFER_OUT" as Route} className="border border-ink py-3 text-center font-serif text-sm hover:bg-paper-2">
+          거래 내역
+        </Link>
+        <Link href={"/customer/home" as Route} className="bg-ink text-paper py-3 text-center font-serif text-sm">
+          홈으로
+        </Link>
+      </div>
+      <button className="w-full border border-rule py-2.5 font-serif text-xs text-ink-2">영수증 다운로드</button>
     </div>
   );
 }

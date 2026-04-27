@@ -2,6 +2,8 @@
 // EDD 큐 — 좌 리스트 + 우 상세 + 결정 영역.
 
 import { useState } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
 import type { EddQueueItem } from "@/data/operator-fixtures";
 
@@ -256,6 +258,12 @@ function DecisionForm({ current, onDecide }: { current: Decision | undefined; on
       <button className="w-full mt-3 bg-ink text-paper py-3 font-serif text-sm">
         결정 확정 (감사로그 기록)
       </button>
+      <Link
+        href={"/operator/customer-360" as Route}
+        className="block w-full mt-2 border border-ink py-2.5 font-serif text-xs text-center hover:bg-paper-2"
+      >
+        고객 360° 에서 추가 검토 →
+      </Link>
     </div>
   );
 }

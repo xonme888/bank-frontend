@@ -11,3 +11,6 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+
+# OpenAPI 자동 생성 — npm run openapi:gen 으로 환경별 갱신
+src/api/schema.d.ts

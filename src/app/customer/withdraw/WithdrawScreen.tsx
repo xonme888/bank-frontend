@@ -8,6 +8,8 @@
 // 백엔드 검증은 customer/home 의 GET 호출에서 이미 검증됨. 본 화면의 요지는 UX 분기 시각화.
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
 import { GaugeRow } from "@/components/primitives/GaugeRow";
 import type { ChannelGroup } from "@/lib/tokens";
@@ -235,7 +237,15 @@ function Success({ amount, balance }: { amount: number; balance: number }) {
         −{amount.toLocaleString("ko-KR")}<span className="text-ink-3 font-normal text-base ml-1">원</span>
       </div>
       <div className="font-mono text-[11px] text-ink-3 mb-6">출금 후 잔액 · {balance.toLocaleString("ko-KR")}원</div>
-      <button className="w-full border border-ink py-3 font-serif text-sm">영수증 다운로드</button>
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <Link href={"/customer/history?type=WITHDRAW" as Route} className="border border-ink py-3 text-center font-serif text-sm hover:bg-paper-2">
+          거래 내역
+        </Link>
+        <Link href={"/customer/home" as Route} className="bg-ink text-paper py-3 text-center font-serif text-sm">
+          홈으로
+        </Link>
+      </div>
+      <button className="w-full border border-rule py-2.5 font-serif text-xs text-ink-2">영수증 다운로드</button>
     </div>
   );
 }

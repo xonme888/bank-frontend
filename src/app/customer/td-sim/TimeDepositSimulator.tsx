@@ -2,6 +2,8 @@
 // 정기예금 시뮬레이터 — 슬라이더·기간 토글·실시간 계산·결제 DDA 선택.
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
 
 const PRODUCTS = [
@@ -264,7 +266,14 @@ function Submitted({ product, amount, period, settlement, calc }: {
         </div>
       </div>
 
-      <button className="w-full border border-ink py-3 font-serif text-sm">정기예금 상세 보기</button>
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <Link href={"/customer/receipt" as Route} className="border border-ink py-3 text-center font-serif text-sm hover:bg-paper-2">
+          만기 영수증 미리보기
+        </Link>
+        <Link href={"/customer/home" as Route} className="bg-ink text-paper py-3 text-center font-serif text-sm">
+          홈으로
+        </Link>
+      </div>
     </div>
   );
 }

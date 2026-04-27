@@ -3,6 +3,8 @@
 // 한도 가드 면제 (BR-TX-90). 검증은 INVALID_TRANSACTION_AMOUNT 1원~10억원만.
 
 import { useState } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
 
 const ACCOUNT = { alias: "주거래 통장", number: "110-***-7890", balance: 2_450_000 };
@@ -158,7 +160,15 @@ function Receipt({ amount, balance, memo }: { amount: number; balance: number; m
         </div>
       </div>
 
-      <button className="w-full border border-ink py-3 font-serif text-sm">영수증 다운로드</button>
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <Link href={"/customer/history?type=DEPOSIT" as Route} className="border border-ink py-3 text-center font-serif text-sm hover:bg-paper-2">
+          거래 내역
+        </Link>
+        <Link href={"/customer/home" as Route} className="bg-ink text-paper py-3 text-center font-serif text-sm">
+          홈으로
+        </Link>
+      </div>
+      <button className="w-full border border-rule py-2.5 font-serif text-xs text-ink-2">영수증 다운로드</button>
     </div>
   );
 }

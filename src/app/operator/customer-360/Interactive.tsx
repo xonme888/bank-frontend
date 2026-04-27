@@ -2,6 +2,8 @@
 // 고객 360° 의 인터랙티브 영역 — 본인확인 토글·응대 사유·CTA 바.
 
 import { useState } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
 
 export function CustomerHeader() {
@@ -45,32 +47,32 @@ export function CustomerHeader() {
 }
 
 export function ActionsBar() {
-  const items: ReadonlyArray<{ label: string; danger?: boolean; ghost?: boolean }> = [
-    { label: "입금 처리" },
-    { label: "출금 처리" },
-    { label: "이체 처리" },
-    { label: "EDD 승인", ghost: true },
-    { label: "정지", danger: true },
-    { label: "해지", danger: true },
+  type Item = { label: string; href?: Route; danger?: boolean; ghost?: boolean };
+  const items: ReadonlyArray<Item> = [
+    { label: "입금 처리",   href: "/customer/deposit" },
+    { label: "출금 처리",   href: "/customer/withdraw" },
+    { label: "이체 처리",   href: "/customer/transfer" },
+    { label: "EDD 큐 →",   href: "/operator/edd",    ghost: true },
+    { label: "감사 diff →", href: "/operator/audit-diff", ghost: true },
+    { label: "정지",         danger: true },
+    { label: "해지",         danger: true },
   ];
   return (
     <footer className="border border-rule-strong bg-paper p-3 flex gap-2 flex-wrap">
       <Eyebrow className="self-center mr-2">대리 처리 (BRANCH actor=OPERATOR)</Eyebrow>
-      {items.map((it) => (
-        <button
-          key={it.label}
-          className={
-            "font-mono text-[11px] tracking-[0.04em] uppercase px-3 py-1.5 border " +
-            (it.danger
-              ? "bg-paper text-st-suspended border-st-suspended hover:bg-st-suspended hover:text-paper"
-              : it.ghost
-                ? "bg-paper text-ink-2 border-rule-strong hover:border-ink hover:text-ink"
-                : "bg-ink text-paper border-ink")
-          }
-        >
-          {it.label}
-        </button>
-      ))}
+      {items.map((it) => {
+        const cls =
+          "font-mono text-[11px] tracking-[0.04em] uppercase px-3 py-1.5 border " +
+          (it.danger
+            ? "bg-paper text-st-suspended border-st-suspended hover:bg-st-suspended hover:text-paper"
+            : it.ghost
+              ? "bg-paper text-ink-2 border-rule-strong hover:border-ink hover:text-ink"
+              : "bg-ink text-paper border-ink");
+        if (it.href) {
+          return <Link key={it.label} href={it.href} className={cls}>{it.label}</Link>;
+        }
+        return <button key={it.label} className={cls}>{it.label}</button>;
+      })}
     </footer>
   );
 }

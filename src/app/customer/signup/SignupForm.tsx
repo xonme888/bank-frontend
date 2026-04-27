@@ -5,6 +5,8 @@
 // 실제 백엔드 호출은 사용 안 함 (시연 안전).
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
 
 type Step = "email" | "terms" | "verify" | "password" | "done";
@@ -314,7 +316,14 @@ function SuccessStep({ email }: { email: string }) {
       <p className="font-serif text-sm text-ink-2 leading-relaxed mb-6">
         첫 입출금 통장을 만들어 자산 관리를 시작하세요.
       </p>
-      <button className="w-full bg-ink text-paper py-3 font-serif text-sm">DDA 개설하기</button>
+      <div className="grid grid-cols-2 gap-2">
+        <Link href={"/customer/home" as Route} className="border border-ink py-3 text-center font-serif text-sm hover:bg-paper-2">
+          홈으로
+        </Link>
+        <Link href={"/customer/home" as Route} className="bg-ink text-paper py-3 text-center font-serif text-sm">
+          DDA 개설하기
+        </Link>
+      </div>
     </div>
   );
 }
