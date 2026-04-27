@@ -1,41 +1,92 @@
 "use client";
-// 정기예금 시뮬레이터 — 슬라이더·기간 토글·실시간 계산·결제 DDA 선택.
+// 정기예금 시뮬레이터 — 슬라이더로 실시간 만기 수령액 + 가입 LIVE.
+//
+// 가입 LIVE 흐름 (정상 시나리오만):
+//   1. POST /api/v1/time-deposits  (KYC + 약관 + 결제 DDA + CDD)
+//   2. POST /api/v1/time-deposits/{id}/deposit  (자금 입금 → ACTIVE 전이)
+// 백엔드 KYC stub: customerName 이 "KYC실패검증" 이 아니면 통과 (StubKycVerifier).
+// 거부 케이스 (한도 초과·결제 DDA 비활성 등) 는 백엔드가 422 반환 → ApiError 분기.
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
+import { api, ApiError } from "@/api/client";
 
-const PRODUCTS = [
-  { code: "TDA-12M", name: "12개월 정기예금",     baseRate: 3.00, preferred: 0.50 },
-  { code: "TDA-24M", name: "24개월 정기예금",     baseRate: 3.30, preferred: 0.40 },
-  { code: "TDA-36M", name: "36개월 정기예금",     baseRate: 3.50, preferred: 0.30 },
-] as const;
-
-const PERIODS_BY_CODE: Record<string, ReadonlyArray<number>> = {
-  "TDA-12M": [6, 12],
-  "TDA-24M": [12, 18, 24],
-  "TDA-36M": [24, 36],
+// 화면 표기 vs 백엔드 productCode 분리 — 백엔드는 TDA001 단일, 화면 라벨만 차별
+type ProductCard = {
+  id: string;            // 화면 식별
+  backendCode: string;   // 백엔드 productCode
+  name: string;
+  baseRate: number;
+  preferred: number;
 };
 
+const PRODUCTS: ReadonlyArray<ProductCard> = [
+  { id: "12M", backendCode: "TDA001", name: "12개월 정기예금", baseRate: 3.00, preferred: 0.50 },
+  { id: "24M", backendCode: "TDA001", name: "24개월 정기예금", baseRate: 3.30, preferred: 0.40 },
+  { id: "36M", backendCode: "TDA001", name: "36개월 정기예금", baseRate: 3.50, preferred: 0.30 },
+];
+
+const PERIODS_BY_ID: Record<string, ReadonlyArray<number>> = {
+  "12M": [6, 12],
+  "24M": [12, 18, 24],
+  "36M": [24, 36],
+};
+
+// 시드된 DDA 와 정합 (DemoSeeder 결과)
 const SETTLEMENT_DDAS = [
   { id: 1, alias: "주거래 통장",   number: "110-***-7890", status: "ACTIVE" },
-  { id: 2, alias: "비상금 통장",   number: "110-***-2381", status: "ACTIVE" },
+  { id: 2, alias: "이체 수취 통장", number: "110-***-1199", status: "ACTIVE" },
   { id: 3, alias: "월급 통장",     number: "110-***-9054", status: "EDD_PENDING", disabled: true },
 ];
 
 const TAX_RATE = 0.154;     // 14% 소득세 + 1.4% 지방소득세
 
+// 백엔드 KYC stub 통과 + 도메인 검증 통과 fixture
+const CDD_FIXTURE = {
+  customerName: "김개발",
+  birthDate: "1990-01-01",
+  idType: "RESIDENT_CARD" as const,
+  idNumber: "900101-1234567",
+  idIssueDate: "2020-01-01",
+  occupation: "EMPLOYEE" as const,
+  workplace: "xbank",
+  transactionPurpose: "SAVINGS" as const,
+  fundSource: "EARNED_INCOME" as const,
+  expectedMonthlyTx: "_1M_TO_5M" as const,
+};
+
+const TERMS_CONSENTS = [
+  { type: "DEPOSIT_BASIC", version: "v1.0" },
+  { type: "PII_USE", version: "v1.0" },
+  { type: "CREDIT_INFO", version: "v1.0" },
+  { type: "TIME_DEPOSIT_BASIC", version: "v1.0" },
+  { type: "TIME_DEPOSIT_INTEREST", version: "v1.0" },
+];
+
+type LiveResult = {
+  timeDepositId: number;
+  productCode: string;
+  termMonths: number;
+  principal: number;
+  rate: number;
+  maturityDate: string;
+  accountNumber: string;
+};
+
 export function TimeDepositSimulator() {
-  const [productCode, setProductCode] = useState<string>(PRODUCTS[0].code);
+  const [productId, setProductId] = useState<string>(PRODUCTS[0].id);
   const [amount, setAmount] = useState(10_000_000);
   const [periodMonths, setPeriodMonths] = useState(12);
   const [settlementId, setSettlementId] = useState<number>(1);
   const [agreed, setAgreed] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [liveResult, setLiveResult] = useState<LiveResult | null>(null);
+  const [liveError, setLiveError] = useState<{ code: string; status: number } | null>(null);
 
-  const product = PRODUCTS.find((p) => p.code === productCode)!;
-  const allowedPeriods = PERIODS_BY_CODE[productCode];
+  const product = PRODUCTS.find((p) => p.id === productId)!;
+  const allowedPeriods = PERIODS_BY_ID[productId];
   const effectivePeriod = allowedPeriods.includes(periodMonths) ? periodMonths : allowedPeriods[0];
   const rate = product.baseRate + product.preferred;
 
@@ -46,16 +97,69 @@ export function TimeDepositSimulator() {
     return { interest, tax, net, total: amount + net };
   }, [amount, rate, effectivePeriod]);
 
-  if (submitted) return <Submitted product={product} amount={amount} period={effectivePeriod} settlement={SETTLEMENT_DDAS.find((s) => s.id === settlementId)!} calc={calc} />;
+  async function submit() {
+    if (!agreed || amount <= 0 || submitting) return;
+    setSubmitting(true);
+    setLiveError(null);
+    try {
+      // 1. 정기예금 약정 (PENDING)
+      type OpenResp = {
+        id: number;
+        productCode: string;
+        accountNumber: string;
+        termMonths: number;
+        principalAmount: number;
+        contractRatePerAnnum: number | string;
+        maturityDate: string;
+      };
+      const opened = await api.post<OpenResp>(`/api/v1/time-deposits`, {
+        customerId: 1,
+        productCode: product.backendCode,
+        term: `MONTHS_${effectivePeriod}`,
+        principalAmount: amount,
+        autoRenewal: false,
+        settlementAccountId: settlementId,
+        cdd: CDD_FIXTURE,
+        termsConsents: TERMS_CONSENTS,
+      });
+
+      // 2. 자금 입금 → ACTIVE 전이
+      await api.post(`/api/v1/time-deposits/${opened.id}/deposit`, {
+        amount,
+      });
+
+      setLiveResult({
+        timeDepositId: opened.id,
+        productCode: opened.productCode,
+        termMonths: opened.termMonths,
+        principal: opened.principalAmount,
+        rate: typeof opened.contractRatePerAnnum === "string"
+          ? parseFloat(opened.contractRatePerAnnum)
+          : opened.contractRatePerAnnum,
+        maturityDate: opened.maturityDate,
+        accountNumber: opened.accountNumber,
+      });
+    } catch (e) {
+      if (e instanceof ApiError) setLiveError({ code: e.code, status: e.status });
+      else setLiveError({ code: "NETWORK_ERROR", status: 0 });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (liveResult) {
+    const settlement = SETTLEMENT_DDAS.find((s) => s.id === settlementId)!;
+    return <LiveDone result={liveResult} settlement={settlement} calc={calc} />;
+  }
 
   return (
     <>
       <ProductPicker
         products={PRODUCTS}
-        active={productCode}
+        active={productId}
         onChange={(c) => {
-          setProductCode(c);
-          setPeriodMonths(PERIODS_BY_CODE[c][0]);
+          setProductId(c);
+          setPeriodMonths(PERIODS_BY_ID[c][0]);
         }}
       />
 
@@ -153,12 +257,27 @@ export function TimeDepositSimulator() {
         </label>
       </section>
 
+      {liveError && (
+        <div className="border-l-2 bg-paper p-3 mb-4" style={{ borderColor: "var(--st-suspended)" }}>
+          <div className="font-mono text-[10px] uppercase tracking-[0.04em]" style={{ color: "var(--st-suspended)" }}>
+            ✕ {liveError.status} {liveError.code}
+          </div>
+          <div className="text-xs text-ink-2 mt-1">
+            {liveError.code === "TIME_DEPOSIT_AMOUNT_OUT_OF_RANGE"
+              ? "가입 금액이 허용 범위(1M~500M)를 벗어났습니다."
+              : liveError.code === "INVALID_SETTLEMENT_ACCOUNT"
+                ? "결제 DDA 가 ACTIVE 상태가 아닙니다."
+                : "백엔드가 가입을 거부했습니다."}
+          </div>
+        </div>
+      )}
+
       <button
-        onClick={() => agreed && setSubmitted(true)}
-        disabled={!agreed || amount <= 0}
+        onClick={submit}
+        disabled={!agreed || amount <= 0 || submitting}
         className="w-full bg-ink text-paper py-4 font-serif text-base disabled:bg-ink-3"
       >
-        가입하기
+        {submitting ? "가입 중… (KYC + 자금 입금 2단계)" : "가입하기 (LIVE)"}
       </button>
     </>
   );
@@ -166,9 +285,9 @@ export function TimeDepositSimulator() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 function ProductPicker({ products, active, onChange }: {
-  products: ReadonlyArray<typeof PRODUCTS[number]>;
+  products: ReadonlyArray<ProductCard>;
   active: string;
-  onChange: (code: string) => void;
+  onChange: (id: string) => void;
 }) {
   return (
     <section className="mb-3">
@@ -176,16 +295,16 @@ function ProductPicker({ products, active, onChange }: {
       <div className="grid grid-cols-3 gap-2">
         {products.map((p) => (
           <button
-            key={p.code}
-            onClick={() => onChange(p.code)}
+            key={p.id}
+            onClick={() => onChange(p.id)}
             className={
               "p-3 text-left border " +
-              (active === p.code
+              (active === p.id
                 ? "bg-ink text-paper border-ink"
                 : "bg-paper text-ink-2 border-rule-strong hover:border-ink hover:text-ink")
             }
           >
-            <div className="font-mono text-[10px] tracking-[0.04em] uppercase mb-1 opacity-70">{p.code}</div>
+            <div className="font-mono text-[10px] tracking-[0.04em] uppercase mb-1 opacity-70">{p.backendCode} · {p.id}</div>
             <div className="font-serif text-sm font-medium leading-tight mb-1">{p.name}</div>
             <div className="font-mono text-[11px] tnum">
               연 {(p.baseRate + p.preferred).toFixed(2)}%
@@ -234,18 +353,23 @@ function ResultCard({ amount, calc, period }: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-function Submitted({ product, amount, period, settlement, calc }: {
-  product: typeof PRODUCTS[number];
-  amount: number;
-  period: number;
+function LiveDone({ result, settlement, calc }: {
+  result: LiveResult;
   settlement: typeof SETTLEMENT_DDAS[number];
-  calc: { interest: number; tax: number; net: number; total: number };
+  calc: { net: number; total: number };
 }) {
   return (
     <div className="border border-rule-strong bg-paper p-6">
-      <div className="font-mono text-[11px] tracking-[0.06em] text-ink-3 uppercase mb-3">200 OK · 가입 완료</div>
-      <div className="font-serif text-[28px] mb-1 leading-tight">{product.name}이 개설되었습니다</div>
-      <div className="font-mono text-[11px] text-ink-3 mb-5">{product.code} · 연 {(product.baseRate + product.preferred).toFixed(2)}% · {period}개월</div>
+      <div className="font-mono text-[11px] tracking-[0.06em] uppercase mb-3" style={{ color: "var(--tx-deposit)" }}>
+        201 CREATED · LIVE · 정기예금 가입 완료
+      </div>
+      <div className="font-serif text-[28px] mb-1 leading-tight">
+        {result.termMonths}개월 정기예금이 개설되었습니다
+      </div>
+      <div className="font-mono text-[11px] text-ink-3 mb-1">
+        #{result.timeDepositId} · {result.productCode} · 연 {result.rate.toFixed(2)}% · 만기 {result.maturityDate}
+      </div>
+      <div className="font-mono text-[11px] text-ink-3 mb-5 tnum">계좌번호 {result.accountNumber}</div>
 
       <div className="border-t border-dashed border-rule pt-4 mb-4">
         <Eyebrow className="mb-2">결제 DDA · 만기·해지 시 자동입금</Eyebrow>
@@ -261,17 +385,17 @@ function Submitted({ product, amount, period, settlement, calc }: {
           </span>
         </div>
         <div className="flex justify-between font-mono text-[11px] text-ink-3 tnum">
-          <span>= 원금 {amount.toLocaleString("ko-KR")}</span>
+          <span>= 원금 {result.principal.toLocaleString("ko-KR")}</span>
           <span>+ 실수령 이자 {calc.net.toLocaleString("ko-KR")}</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 mb-2">
-        <Link href={"/customer/receipt" as Route} className="border border-ink py-3 text-center font-serif text-sm hover:bg-paper-2">
-          만기 영수증 미리보기
+      <div className="grid grid-cols-2 gap-2">
+        <Link href={"/customer/home" as Route} className="border border-ink py-3 text-center font-serif text-sm hover:bg-paper-2">
+          홈에서 카드 확인
         </Link>
-        <Link href={"/customer/home" as Route} className="bg-ink text-paper py-3 text-center font-serif text-sm">
-          홈으로
+        <Link href={"/customer/receipt" as Route} className="bg-ink text-paper py-3 text-center font-serif text-sm">
+          만기 영수증 미리보기
         </Link>
       </div>
     </div>
