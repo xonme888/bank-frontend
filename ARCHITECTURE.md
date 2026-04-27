@@ -14,8 +14,7 @@ src/
 ├── components/
 │   ├── chrome/               Device, DesktopFrame, ScreenStage
 │   ├── shells/DeskShell      backoffice/ops 사이드바+헤더
-│   ├── primitives/           Eyebrow, StatusBadge, GaugeRow, Money
-│   └── ScreenPlaceholder     이식 전 임시 페이지
+│   └── primitives/           Eyebrow, StatusBadge, GaugeRow, Money
 ├── lib/
 │   ├── screens.ts            16화면 카탈로그 + route 매핑
 │   └── tokens.ts             AccountState/TxType/Channel/Actor 토큰
@@ -40,12 +39,13 @@ src/
 색은 **모두 CSS 변수에 둠**. tailwind 는 그 변수를 색 클래스로 노출만 함.
 다크모드/테마 전환 시 `globals.css` 의 `:root` 한 곳만 바꾸면 끝.
 
-## 다음 단계 (Claude Code)
+## API · 데이터 레이어
 
-1. **컴포넌트 1개씩 이식** — `customer/home` 부터.
-   원본: `xbank/screens.jsx` 의 `Home` 함수 → `src/app/customer/home/page.tsx`.
-   인터랙션 있는 부분만 `"use client"`로 격리.
-2. **fixture 분리** — 가짜 거래 데이터를 `src/data/transactions.ts` 로.
-3. **차트** — FDS heatmap, 실시간 모니터는 `recharts` 또는 `visx` 도입 검토.
-4. **API 레이어** — 실제 백엔드 OpenAPI 가 생기면 `src/api/` 에 client 생성.
-5. **테스트** — Playwright 로 16화면 visual regression.
+- **타입 client**: `openapi-typescript` 가 `/v3/api-docs` 에서 자동 생성 → `src/api/schema.d.ts` (gitignore)
+- **fetch wrapper**: `src/api/client.ts` 가 `X-Actor` 헤더 + `Idempotency-Key` 자동 주입, `ApiError` 로 ErrorCode 정합
+- **fixture**: 백엔드 endpoint 미구현 영역만 `src/data/*.ts` 로 분리 (의도된 mock)
+
+## 시각 회귀
+
+Playwright 1.59 + Chromium headless. 16 화면 + 16 시나리오 토글 = 32 baseline.
+스냅샷은 `tests/*-snapshots/` 에 git 추적 — 디자인 변경 시 명시적 갱신 강제 (`npm run test:e2e:update`).
