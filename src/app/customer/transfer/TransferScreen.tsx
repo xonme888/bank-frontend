@@ -1,16 +1,13 @@
 "use client";
-// 이체 3-단계 화면 — 입력 → 확인 → 완료. 시나리오 토글로 분기 시연.
-//
-// 분기:
-//  - none:     200 OK + transferGroupId 양변 timeline
-//  - same:     SAME_ACCOUNT_TRANSFER (입력 단계 인라인)
-//  - fds:      FRAUD_DETECTION_REJECTED (확인 단계 모달)
-//  - idem:     IDEMPOTENCY_KEY_REUSED (확인 단계 노란 배너)
+// 이체 3-단계 — 입력 → 확인 → 완료.
+//   정상 시나리오 (none): POST /api/v1/transfers (fromAccountId=1, toAccountId=2) 실 호출
+//   거부 시나리오 (same/fds/idem): mock 분기 보존 — 자연 발생 어려운 케이스 시연용
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
+import { api, ApiError } from "@/api/client";
 
 type Scenario = "none" | "same" | "fds" | "idem";
 type Step = "input" | "confirm" | "done";
@@ -22,8 +19,18 @@ const SCENARIOS: ReadonlyArray<{ id: Scenario; label: string; codeBadge: string 
   { id: "idem", label: "Idempotency 재사용", codeBadge: "IDEMPOTENCY_KEY_REUSED" },
 ];
 
-const FROM = { alias: "주거래 통장", number: "110-***-7890", balance: 2_450_000 };
-const TO_DEFAULT = { name: "김**", bank: "신한은행", number: "100-***-5544" };
+const FROM_ACCOUNT_ID = 1;
+const TO_ACCOUNT_ID = 2;            // 두 번째 시드 계좌
+const FROM = { alias: "주거래 통장", number: "110-***-7890" };
+const TO_DEFAULT = { name: "수취 계좌 (자기 명의)", bank: "xbank", number: "110-***-1199" };
+
+type LiveResult = {
+  amount: number;
+  groupId: string;
+  fromTxnId: number;
+  toTxnId: number;
+  fromBalanceAfter: string;
+};
 
 export function TransferScreen({ initialScenario }: { initialScenario: string }) {
   const [scenario, setScenario] = useState<Scenario>(toScenario(initialScenario));
@@ -31,14 +38,55 @@ export function TransferScreen({ initialScenario }: { initialScenario: string })
   const [amount, setAmount] = useState(150_000);
   const [memo, setMemo] = useState("");
   const [recipient, setRecipient] = useState(`${TO_DEFAULT.bank} ${TO_DEFAULT.number}`);
+  const [submitting, setSubmitting] = useState(false);
+  const [liveResult, setLiveResult] = useState<LiveResult | null>(null);
+  const [liveError, setLiveError] = useState<{ code: string; status: number } | null>(null);
 
   const def = useMemo(() => SCENARIOS.find((s) => s.id === scenario)!, [scenario]);
   const sameAccount = scenario === "same";
-  const groupId = useMemo(() => fakeUuid(), [step, scenario]);
+
+  async function submitTransfer() {
+    if (def.id !== "none") {
+      // 거부 시나리오 — mock 분기
+      if (def.id !== "fds" && def.id !== "idem") return;
+      setStep("done");
+      return;
+    }
+    setSubmitting(true);
+    setLiveError(null);
+    try {
+      type TransferResp = {
+        transferGroupId: string;
+        fromTransaction: { transactionId: number; balanceAfter: string };
+        toTransaction:   { transactionId: number };
+      };
+      const resp = await api.post<TransferResp>(`/api/v1/transfers`, {
+        fromAccountId: FROM_ACCOUNT_ID,
+        toAccountId:   TO_ACCOUNT_ID,
+        amount,
+        description: memo || undefined,
+      });
+      setLiveResult({
+        amount,
+        groupId: resp.transferGroupId,
+        fromTxnId: resp.fromTransaction.transactionId,
+        toTxnId: resp.toTransaction.transactionId,
+        fromBalanceAfter: resp.fromTransaction.balanceAfter,
+      });
+      setStep("done");
+    } catch (e) {
+      if (e instanceof ApiError) setLiveError({ code: e.code, status: e.status });
+      else setLiveError({ code: "NETWORK_ERROR", status: 0 });
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <>
-      <ScenarioToggle value={scenario} onChange={(s) => { setScenario(s); setStep("input"); }} />
+      <ScenarioToggle value={scenario} onChange={(s) => {
+        setScenario(s); setStep("input"); setLiveResult(null); setLiveError(null);
+      }} />
       <StepIndicator step={step} />
 
       {step === "input" && (
@@ -59,15 +107,60 @@ export function TransferScreen({ initialScenario }: { initialScenario: string })
           amount={amount}
           memo={memo}
           scenario={def}
+          submitting={submitting}
+          liveError={liveError}
           onBack={() => setStep("input")}
-          onSubmit={() => def.id === "none" ? setStep("done") : null}
+          onSubmit={submitTransfer}
         />
       )}
 
-      {step === "done" && (
-        <DoneStep amount={amount} groupId={groupId} />
-      )}
+      {step === "done" && liveResult && <LiveDone result={liveResult} />}
+      {step === "done" && !liveResult && <DoneStep amount={amount} groupId={fakeUuid()} />}
     </>
+  );
+}
+
+function LiveDone({ result }: { result: LiveResult }) {
+  return (
+    <div className="border border-rule-strong bg-paper p-6">
+      <div className="font-mono text-[11px] tracking-[0.06em] uppercase mb-3" style={{ color: "var(--tx-deposit)" }}>
+        200 OK · LIVE · 이체 완료
+      </div>
+      <div className="font-serif text-[28px] mb-1 leading-tight">이체되었습니다</div>
+      <div className="font-sans tnum font-medium text-[40px] tracking-[-0.025em] mb-1">
+        −{result.amount.toLocaleString("ko-KR")}<span className="text-ink-3 font-normal text-base ml-1">원</span>
+      </div>
+      <div className="font-mono text-[11px] text-ink-3 mb-2">
+        송금 후 잔액 · {result.fromBalanceAfter}원 (PiiMasker — 거래 영수증)
+      </div>
+      <div className="my-5 border-t border-dashed border-rule" />
+      <Eyebrow className="mb-3">transferGroupId · 양변 한 commit</Eyebrow>
+      <ol className="space-y-2 mb-5">
+        <li className="flex gap-3">
+          <span className="font-mono text-[10px] text-ink-3 w-12 tnum">out</span>
+          <span className="text-sm">
+            <span className="font-mono text-[10px] mr-1.5 px-1.5 py-px border" style={{ color: "var(--tx-transfer-out)", borderColor: "var(--tx-transfer-out)" }}>TRANSFER_OUT</span>
+            거래 #{result.fromTxnId}
+          </span>
+        </li>
+        <li className="flex gap-3">
+          <span className="font-mono text-[10px] text-ink-3 w-12 tnum">in</span>
+          <span className="text-sm">
+            <span className="font-mono text-[10px] mr-1.5 px-1.5 py-px border" style={{ color: "var(--tx-transfer-in)", borderColor: "var(--tx-transfer-in)" }}>TRANSFER_IN</span>
+            거래 #{result.toTxnId}
+          </span>
+        </li>
+      </ol>
+      <div className="font-mono text-[10px] text-ink-3 mb-5 break-all">groupId: {result.groupId}</div>
+      <div className="grid grid-cols-2 gap-2">
+        <Link href={"/customer/history?type=TRANSFER_OUT" as Route} className="border border-ink py-3 text-center font-serif text-sm hover:bg-paper-2">
+          거래 내역
+        </Link>
+        <Link href={"/customer/home" as Route} className="bg-ink text-paper py-3 text-center font-serif text-sm">
+          홈으로
+        </Link>
+      </div>
+    </div>
   );
 }
 
@@ -130,7 +223,7 @@ function InputStep({
         <Eyebrow className="mb-1">출금 계좌</Eyebrow>
         <div className="font-serif text-sm font-medium">{FROM.alias}</div>
         <div className="font-mono text-[11px] text-ink-3 tnum">
-          {FROM.number} · 잔액 {FROM.balance.toLocaleString("ko-KR")}원
+          {FROM.number} · 계좌 #{FROM_ACCOUNT_ID}
         </div>
       </section>
 
@@ -190,11 +283,13 @@ function InputStep({
 
 // ─────────────────────────────────────────────────────────────────────────────
 function ConfirmStep({
-  amount, memo, scenario, onBack, onSubmit,
+  amount, memo, scenario, submitting, liveError, onBack, onSubmit,
 }: {
   amount: number;
   memo: string;
   scenario: typeof SCENARIOS[number];
+  submitting: boolean;
+  liveError: { code: string; status: number } | null;
   onBack: () => void;
   onSubmit: () => void;
 }) {
@@ -208,7 +303,7 @@ function ConfirmStep({
       <section className="border border-rule-strong bg-paper p-5 mb-3">
         <Eyebrow className="mb-3">출금 측</Eyebrow>
         <Row label="계좌" value={`${FROM.alias} · ${FROM.number}`} />
-        <Row label="출금 후 잔액" value={`${(FROM.balance - amount).toLocaleString("ko-KR")}원`} mono />
+        <Row label="이체 금액" value={`${amount.toLocaleString("ko-KR")}원`} mono />
 
         <div className="my-4 border-t border-dashed border-rule" />
 
@@ -229,16 +324,25 @@ function ConfirmStep({
 
       <FdsEvaluation rejected={isFds} />
 
+      {liveError && (
+        <div className="border-l-2 bg-paper p-3 mt-3" style={{ borderColor: "var(--st-suspended)" }}>
+          <div className="font-mono text-[10px] uppercase tracking-[0.04em]" style={{ color: "var(--st-suspended)" }}>
+            ✕ {liveError.status} {liveError.code}
+          </div>
+          <div className="text-xs text-ink-2 mt-1">백엔드가 이체를 거부했습니다 (실 데이터 기반).</div>
+        </div>
+      )}
+
       <div className="flex gap-2 mt-4">
         <button onClick={onBack} className="flex-1 border border-ink py-3 font-serif text-sm">
           이전
         </button>
         <button
           onClick={onSubmit}
-          disabled={isFds || isIdem}
+          disabled={isIdem || submitting}
           className="flex-[2] bg-ink text-paper py-3 font-serif text-base disabled:bg-ink-3"
         >
-          이체하기
+          {submitting ? "처리 중…" : scenario.id === "none" ? "이체하기 (LIVE)" : "이체하기"}
         </button>
       </div>
 

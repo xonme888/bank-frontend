@@ -1,13 +1,14 @@
 "use client";
 // 4 단계 가입 폼 — 이메일 → 약관 → 본인확인 → 비밀번호 → 완료.
 //
-// 시나리오 토글로 DUPLICATE_EMAIL (CLOSED 포함) / 정상 진행 분기 시연.
-// 실제 백엔드 호출은 사용 안 함 (시연 안전).
+// 정상 시나리오 (none): POST /api/v1/customers 실 호출 — DUPLICATE_EMAIL 자연 발생 가능
+// 거부 시나리오 (dup, dup_closed): mock 인라인 분기 (CLOSED 정책 시연용)
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
+import { api, ApiError } from "@/api/client";
 
 type Step = "email" | "terms" | "verify" | "password" | "done";
 type Scenario = "none" | "dup" | "dup_closed";
@@ -30,10 +31,14 @@ export function SignupForm({ initialScenario }: { initialScenario: string }) {
   const [scenario, setScenario] = useState<Scenario>(toScenario(initialScenario));
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [agreed, setAgreed] = useState({ tos: false, privacy: false, marketing: false });
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [pw, setPw] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [liveError, setLiveError] = useState<{ code: string; status: number } | null>(null);
+  const [createdCustomerId, setCreatedCustomerId] = useState<number | null>(null);
 
   const dupError = useMemo(() => {
     if (scenario === "none") return null;
@@ -46,24 +51,58 @@ export function SignupForm({ initialScenario }: { initialScenario: string }) {
   const idx = STEPS.findIndex((s) => s.id === step);
   const required = agreed.tos && agreed.privacy;
 
+  async function submitSignup() {
+    if (scenario !== "none") {
+      setStep("done");        // mock — DUPLICATE_EMAIL 시나리오는 인라인 에러 단계에서 멈춤
+      return;
+    }
+    setSubmitting(true);
+    setLiveError(null);
+    try {
+      type CreateResp = { id: number; name: string; email: string };
+      const resp = await api.post<CreateResp>(`/api/v1/customers`, {
+        name: name || "신규 고객",
+        email,
+        phoneNumber: phone,
+        password: pw,
+      });
+      setCreatedCustomerId(resp.id);
+      setStep("done");
+    } catch (e) {
+      if (e instanceof ApiError) setLiveError({ code: e.code, status: e.status });
+      else setLiveError({ code: "NETWORK_ERROR", status: 0 });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <>
       <ScenarioToggle value={scenario} onChange={(s) => { setScenario(s); setStep("email"); }} />
       <StepIndicator current={idx} />
 
       {step === "email" && (
-        <Section title="이메일">
+        <Section title="이메일 · 이름">
+          <Eyebrow className="mb-1.5">이메일</Eyebrow>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
+            className="w-full bg-transparent border-b border-rule focus:outline-none focus:border-ink font-serif text-base py-1 mb-4"
+          />
+          <Eyebrow className="mb-1.5">이름</Eyebrow>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value.slice(0, 50))}
+            placeholder="홍길동"
             className="w-full bg-transparent border-b border-rule focus:outline-none focus:border-ink font-serif text-base py-1"
           />
           {dupError && <DupErrorInline kind={dupError.kind} summary={dupError.summary} />}
           <FooterCta
-            onNext={() => !dupError && email.length > 3 && setStep("terms")}
-            disabled={!!dupError || email.length < 5}
+            onNext={() => !dupError && email.length > 3 && name.length > 0 && setStep("terms")}
+            disabled={!!dupError || email.length < 5 || name.length === 0}
           />
         </Section>
       )}
@@ -129,20 +168,34 @@ export function SignupForm({ initialScenario }: { initialScenario: string }) {
             type="password"
             value={pw}
             onChange={(e) => setPw(e.target.value)}
-            placeholder="대소문자·숫자·특수문자 조합 8자 이상"
+            placeholder="영문자+숫자 8자 이상"
             className="w-full bg-transparent border-b border-rule focus:outline-none focus:border-ink font-mono text-base py-1 mb-3"
           />
           <PasswordStrength pw={pw} />
+          {liveError && (
+            <div className="border-l-2 bg-paper p-3 mt-3" style={{ borderColor: "var(--st-suspended)" }}>
+              <div className="font-mono text-[10px] uppercase tracking-[0.04em]" style={{ color: "var(--st-suspended)" }}>
+                ✕ {liveError.status} {liveError.code}
+              </div>
+              <div className="text-xs text-ink-2 mt-1">
+                {liveError.code === "DUPLICATE_EMAIL"
+                  ? "이미 가입된 이메일 — 다른 이메일로 다시 시도하거나 로그인 화면 이용."
+                  : liveError.code === "VALIDATION_ERROR"
+                    ? "입력값이 백엔드 정규식과 어긋남 (전화번호 010-0000-0000 형식, 비밀번호 영문+숫자)."
+                    : "백엔드가 가입을 거부했습니다."}
+              </div>
+            </div>
+          )}
           <FooterCta
             onPrev={() => setStep("verify")}
-            onNext={() => pw.length >= 8 && setStep("done")}
-            disabled={pw.length < 8}
-            nextLabel="가입하기"
+            onNext={submitSignup}
+            disabled={pw.length < 8 || submitting}
+            nextLabel={submitting ? "가입 중…" : scenario === "none" ? "가입하기 (LIVE)" : "가입하기"}
           />
         </Section>
       )}
 
-      {step === "done" && <SuccessStep email={email} />}
+      {step === "done" && <SuccessStep email={email} customerId={createdCustomerId} live={scenario === "none" && !!createdCustomerId} />}
     </>
   );
 }
@@ -305,14 +358,22 @@ function scorePassword(pw: string): number {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-function SuccessStep({ email }: { email: string }) {
+function SuccessStep({ email, customerId, live }: { email: string; customerId: number | null; live: boolean }) {
   return (
     <div className="border border-rule-strong bg-paper p-6">
-      <div className="font-mono text-[11px] tracking-[0.06em] text-ink-3 uppercase mb-3">200 OK · 가입 완료</div>
+      <div
+        className="font-mono text-[11px] tracking-[0.06em] uppercase mb-3"
+        style={{ color: live ? "var(--tx-deposit)" : "var(--ink-3)" }}
+      >
+        {live ? "201 CREATED · LIVE · 가입 완료" : "201 CREATED · MOCK · 가입 완료"}
+      </div>
       <div className="font-serif text-[28px] leading-tight mb-2">환영합니다</div>
       <p className="font-serif text-sm text-ink-2 leading-relaxed mb-1">
         <span className="font-mono text-xs">{email || "you@example.com"}</span> 으로 환영 메일이 발송되었습니다.
       </p>
+      {customerId && (
+        <p className="font-mono text-[11px] text-ink-3 mb-1 tnum">고객 ID #{customerId}</p>
+      )}
       <p className="font-serif text-sm text-ink-2 leading-relaxed mb-6">
         첫 입출금 통장을 만들어 자산 관리를 시작하세요.
       </p>

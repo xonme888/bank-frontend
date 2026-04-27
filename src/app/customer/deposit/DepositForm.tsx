@@ -1,24 +1,68 @@
 "use client";
-// 입금 폼 — 금액·메모·미리보기·영수증.
+// 입금 폼 — 실 백엔드 호출 (POST /api/v1/accounts/1/deposit).
 // 한도 가드 면제 (BR-TX-90). 검증은 INVALID_TRANSACTION_AMOUNT 1원~10억원만.
 
 import { useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
+import { api, ApiError } from "@/api/client";
 
-const ACCOUNT = { alias: "주거래 통장", number: "110-***-7890", balance: 2_450_000 };
+const ACCOUNT_ID = 1;
+const ACCOUNT = { alias: "주거래 통장", number: "110-***-7890" };
 const MAX_AMOUNT = 1_000_000_000;
+
+type ReceiptData = {
+  amount: number;
+  balanceAfter: string;       // 백엔드 마스킹 그대로 (TransactionResponse 정책)
+  memo: string;
+  txnId: number;
+  traceId: string | null;
+};
 
 export function DepositForm() {
   const [amount, setAmount] = useState(100_000);
   const [memo, setMemo] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const [error, setError] = useState<{ code: string; status: number } | null>(null);
 
   const invalid = amount <= 0 || amount > MAX_AMOUNT;
-  const projected = ACCOUNT.balance + amount;
 
-  if (submitted) return <Receipt amount={amount} balance={projected} memo={memo} />;
+  async function submit() {
+    if (invalid || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      type TxResp = {
+        id: number;
+        amount: string;
+        balanceAfter: string;
+        traceId: string | null;
+      };
+      const resp = await api.post<TxResp>(`/api/v1/accounts/${ACCOUNT_ID}/deposit`, {
+        amount,
+        description: memo || undefined,
+      });
+      setReceipt({
+        amount,
+        balanceAfter: resp.balanceAfter,
+        memo,
+        txnId: resp.id,
+        traceId: resp.traceId,
+      });
+    } catch (e) {
+      if (e instanceof ApiError) {
+        setError({ code: e.code, status: e.status });
+      } else {
+        setError({ code: "NETWORK_ERROR", status: 0 });
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (receipt) return <Receipt data={receipt} />;
 
   return (
     <>
@@ -27,13 +71,11 @@ export function DepositForm() {
           <div>
             <Eyebrow className="mb-1">입금 계좌</Eyebrow>
             <div className="font-serif text-sm font-medium">{ACCOUNT.alias}</div>
-            <div className="font-mono text-[11px] text-ink-3 tnum">{ACCOUNT.number} · DDA-CHECK</div>
+            <div className="font-mono text-[11px] text-ink-3 tnum">{ACCOUNT.number} · DDA001</div>
           </div>
           <div className="text-right">
-            <Eyebrow className="mb-1">현재 잔액</Eyebrow>
-            <div className="font-sans tnum font-medium text-lg">
-              {ACCOUNT.balance.toLocaleString("ko-KR")}<span className="text-ink-3 font-normal text-xs ml-1">원</span>
-            </div>
+            <Eyebrow className="mb-1">계좌 ID</Eyebrow>
+            <div className="font-mono tnum text-sm">#{ACCOUNT_ID}</div>
           </div>
         </div>
       </section>
@@ -91,18 +133,6 @@ export function DepositForm() {
         <div className="font-mono text-[10px] text-ink-3 mt-1 text-right tnum">{memo.length}/32</div>
       </section>
 
-      <section className="border border-dashed border-rule-strong p-4 mb-2 bg-paper-2">
-        <div className="flex justify-between items-baseline mb-1">
-          <Eyebrow>입금 후 잔액</Eyebrow>
-          <span className="font-sans tnum font-medium text-lg" style={{ color: "var(--tx-deposit)" }}>
-            {projected.toLocaleString("ko-KR")}<span className="text-ink-3 font-normal text-xs ml-1">원</span>
-          </span>
-        </div>
-        <div className="font-mono text-[10px] text-ink-3 tnum">
-          {ACCOUNT.balance.toLocaleString("ko-KR")} + {amount.toLocaleString("ko-KR")}
-        </div>
-      </section>
-
       <section className="border-l-2 bg-paper p-3 mb-4" style={{ borderColor: "var(--tx-deposit)" }}>
         <div className="font-mono text-[10px] uppercase tracking-[0.04em]" style={{ color: "var(--tx-deposit)" }}>
           한도 가드 면제
@@ -112,19 +142,34 @@ export function DepositForm() {
         </div>
       </section>
 
+      {error && <ErrorBanner code={error.code} status={error.status} />}
+
       <button
-        onClick={() => !invalid && setSubmitted(true)}
-        disabled={invalid}
+        onClick={submit}
+        disabled={invalid || submitting}
         className="w-full bg-ink text-paper py-4 font-serif text-base disabled:bg-ink-3"
       >
-        입금하기
+        {submitting ? "처리 중…" : "입금하기"}
       </button>
     </>
   );
 }
 
+function ErrorBanner({ code, status }: { code: string; status: number }) {
+  return (
+    <div className="border-l-2 bg-paper p-3 mb-3" style={{ borderColor: "var(--st-suspended)" }}>
+      <div className="font-mono text-[10px] uppercase tracking-[0.04em]" style={{ color: "var(--st-suspended)" }}>
+        ✕ {status} {code}
+      </div>
+      <div className="text-xs text-ink-2 mt-1">
+        백엔드가 거래를 거부했습니다. 금액·계좌 상태 확인 후 다시 시도하세요.
+      </div>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-function Receipt({ amount, balance, memo }: { amount: number; balance: number; memo: string }) {
+function Receipt({ data }: { data: ReceiptData }) {
   return (
     <div className="border border-rule-strong bg-paper p-6">
       <div className="font-mono text-[11px] tracking-[0.06em] text-ink-3 uppercase mb-3">200 OK · 입금 완료</div>
@@ -133,10 +178,10 @@ function Receipt({ amount, balance, memo }: { amount: number; balance: number; m
         className="font-sans tnum font-medium text-[40px] tracking-[-0.025em] mb-1"
         style={{ color: "var(--tx-deposit)" }}
       >
-        +{amount.toLocaleString("ko-KR")}<span className="text-ink-3 font-normal text-base ml-1">원</span>
+        +{data.amount.toLocaleString("ko-KR")}<span className="text-ink-3 font-normal text-base ml-1">원</span>
       </div>
       <div className="font-mono text-[11px] text-ink-3 mb-5">
-        입금 후 잔액 · {balance.toLocaleString("ko-KR")}원
+        입금 후 잔액 · {data.balanceAfter}원 (PiiMasker 마스킹 — 거래 영수증 정책)
       </div>
 
       <div className="border-t border-dashed border-rule pt-4 mb-5">
@@ -147,15 +192,15 @@ function Receipt({ amount, balance, memo }: { amount: number; balance: number; m
           </div>
           <div>
             <div className="text-ink-3 mb-0.5">메모</div>
-            <div>{memo || "—"}</div>
+            <div>{data.memo || "—"}</div>
           </div>
           <div>
-            <div className="text-ink-3 mb-0.5">유형</div>
-            <div style={{ color: "var(--tx-deposit)" }}>DEPOSIT</div>
+            <div className="text-ink-3 mb-0.5">거래 ID</div>
+            <div className="tnum">#{data.txnId}</div>
           </div>
           <div>
-            <div className="text-ink-3 mb-0.5">채널</div>
-            <div>MOBILE · CUSTOMER</div>
+            <div className="text-ink-3 mb-0.5">trace_id</div>
+            <div className="tnum break-all">{data.traceId ?? "—"}</div>
           </div>
         </div>
       </div>

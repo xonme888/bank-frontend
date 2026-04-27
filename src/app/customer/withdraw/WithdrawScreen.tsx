@@ -1,18 +1,18 @@
 "use client";
-// 출금 화면 핵심 인터랙션 — 키패드·시나리오 토글·결과 분기.
+// 출금 화면 — 정상 시나리오는 실 API (POST /api/v1/accounts/1/withdraw),
+// 거부 시나리오는 mock (자연 발생 어려운 거부 케이스 시연용 분기 보존).
 //
 // 시나리오 ID 와 거부 ErrorCode 매핑은 백엔드 ErrorCode 와 1:1.
-// 실제 백엔드 호출은 사용 안 함 (시연 안전 — 같은 키 재사용·실 자금 영향 회피) —
-// 대신 시나리오 선택에 따라 응답을 mock 하여 결과 화면을 그린다.
-//
-// 백엔드 검증은 customer/home 의 GET 호출에서 이미 검증됨. 본 화면의 요지는 UX 분기 시각화.
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
 import { GaugeRow } from "@/components/primitives/GaugeRow";
+import { api, ApiError } from "@/api/client";
 import type { ChannelGroup } from "@/lib/tokens";
+
+const ACCOUNT_ID = 1;
 
 type Scenario =
   | "none"
@@ -41,11 +41,21 @@ const DAILY_ATM_LIMIT = 1_000_000;
 const USED_TRANSFER = 3_000_000;
 const USED_ATM = 250_000;
 
+type LiveResult = {
+  amount: number;
+  balanceAfter: string;
+  txnId: number;
+  traceId: string | null;
+};
+
 export function WithdrawScreen({ initialScenario }: { initialScenario: string }) {
   const [scenario, setScenario] = useState<Scenario>(toScenario(initialScenario));
   const [amount, setAmount] = useState<number>(50_000);
   const [memo, setMemo] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [liveResult, setLiveResult] = useState<LiveResult | null>(null);
+  const [liveError, setLiveError] = useState<{ code: string; status: number } | null>(null);
 
   const def = useMemo(() => SCENARIOS.find((s) => s.id === scenario)!, [scenario]);
 
@@ -56,34 +66,112 @@ export function WithdrawScreen({ initialScenario }: { initialScenario: string })
   function pickAmount(n: number) {
     setAmount(n);
     setSubmitted(false);
+    setLiveResult(null);
+    setLiveError(null);
+  }
+
+  async function submit() {
+    if (amount <= 0 || submitting) return;
+    if (def.id !== "none") {
+      // 거부 시나리오 — mock 분기 (자연 발생 어려운 케이스 시연 보존)
+      setSubmitted(true);
+      return;
+    }
+    // 정상 시나리오 — 실 API 호출
+    setSubmitting(true);
+    setLiveError(null);
+    try {
+      type TxResp = { id: number; balanceAfter: string; traceId: string | null };
+      const resp = await api.post<TxResp>(`/api/v1/accounts/${ACCOUNT_ID}/withdraw`, {
+        amount,
+        description: memo || undefined,
+      });
+      setLiveResult({ amount, balanceAfter: resp.balanceAfter, txnId: resp.id, traceId: resp.traceId });
+      setSubmitted(true);
+    } catch (e) {
+      if (e instanceof ApiError) {
+        setLiveError({ code: e.code, status: e.status });
+      } else {
+        setLiveError({ code: "NETWORK_ERROR", status: 0 });
+      }
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
     <>
-      <ScenarioToggle value={scenario} onChange={(s) => { setScenario(s); setSubmitted(false); }} />
+      <ScenarioToggle value={scenario} onChange={(s) => {
+        setScenario(s);
+        setSubmitted(false);
+        setLiveResult(null);
+        setLiveError(null);
+      }} />
 
-      {submitted && def.id !== "none"
-        ? <Rejection scenario={def} amount={amount} />
-        : submitted
-          ? <Success amount={amount} balance={projected} />
+      {submitted && liveResult
+        ? <LiveSuccess result={liveResult} />
+        : submitted && def.id !== "none"
+          ? <Rejection scenario={def} amount={amount} />
           : (
             <>
               <AccountCard />
-              <AmountInput amount={amount} onPick={pickAmount} onChange={(n) => { setAmount(n); setSubmitted(false); }} />
+              <AmountInput amount={amount} onPick={pickAmount} onChange={(n) => { setAmount(n); setSubmitted(false); setLiveResult(null); }} />
               <Limits transferPct={transferPct} atmPct={atmPct} channel={def.channel} />
               <MemoInput memo={memo} onChange={setMemo} />
               <Preview projected={projected} />
+              {liveError && <LiveErrorBanner code={liveError.code} status={liveError.status} />}
               <button
-                onClick={() => setSubmitted(true)}
-                disabled={amount <= 0}
+                onClick={submit}
+                disabled={amount <= 0 || submitting}
                 className="w-full mt-5 bg-ink text-paper py-4 font-serif text-base disabled:bg-ink-3"
               >
-                출금하기
+                {submitting ? "처리 중…" : def.id === "none" ? "출금하기 (LIVE)" : "출금하기"}
               </button>
             </>
           )
       }
     </>
+  );
+}
+
+function LiveSuccess({ result }: { result: LiveResult }) {
+  return (
+    <div className="border border-rule-strong bg-paper p-8">
+      <div className="font-mono text-[11px] tracking-[0.06em] uppercase mb-3" style={{ color: "var(--tx-deposit)" }}>
+        200 OK · LIVE · 출금 완료
+      </div>
+      <div className="font-serif text-[28px] mb-1 leading-tight">출금되었습니다</div>
+      <div className="font-sans tnum font-medium text-[40px] tracking-[-0.025em] mb-1">
+        −{result.amount.toLocaleString("ko-KR")}<span className="text-ink-3 font-normal text-base ml-1">원</span>
+      </div>
+      <div className="font-mono text-[11px] text-ink-3 mb-2">
+        출금 후 잔액 · {result.balanceAfter}원 (PiiMasker — 거래 영수증 정책)
+      </div>
+      <div className="font-mono text-[10px] text-ink-3 mb-6 tnum">
+        거래 #{result.txnId} · trace_id {result.traceId ?? "—"}
+      </div>
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <Link href={"/customer/history?type=WITHDRAW" as Route} className="border border-ink py-3 text-center font-serif text-sm hover:bg-paper-2">
+          거래 내역
+        </Link>
+        <Link href={"/customer/home" as Route} className="bg-ink text-paper py-3 text-center font-serif text-sm">
+          홈으로
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function LiveErrorBanner({ code, status }: { code: string; status: number }) {
+  return (
+    <div className="border-l-2 bg-paper p-3 mt-3" style={{ borderColor: "var(--st-suspended)" }}>
+      <div className="font-mono text-[10px] uppercase tracking-[0.04em]" style={{ color: "var(--st-suspended)" }}>
+        ✕ {status} {code}
+      </div>
+      <div className="text-xs text-ink-2 mt-1">
+        백엔드가 거래를 거부했습니다. (실제 잔액·한도·계좌 상태 기반 — 시나리오 토글이 아닌 실 데이터)
+      </div>
+    </div>
   );
 }
 
