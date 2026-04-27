@@ -14,6 +14,11 @@ export type DashboardCard = {
   accountNumber: string;
   status: AccountState;
   balance: number;
+  /**
+   * 백엔드 PiiMasker 가 마지막 3자리만 *** 로 가린 형태 (예: "2,450,***").
+   * REAL 카드만 백엔드 응답 그대로 보존. fixture 카드는 number 로 직접 포맷.
+   */
+  balanceMasked?: string;
 };
 
 export type TimeDepositCard = {
