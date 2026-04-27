@@ -1,19 +1,32 @@
 // 화면 1 — 계좌 대시보드 (Home).
-// API 연결 검증용 RSC: GET /api/v1/accounts/{id} + /balance 두 endpoint 호출.
-// 백엔드가 응답하면 마스킹 계좌번호·잔액·상태 배지를, 그렇지 않으면 안내를 표시.
+//
+// IA 매핑 (docs/ux/screen-ia.md §화면 1):
+//   ① 헤더 인사말  ② 자산 요약 + Δ  ③ 비율 도넛  ④ 빠른 액션 4-버튼
+//   ⑤ DDA 카드 리스트  ⑥ 정기예금 카드 리스트  ⑦ 알림 영역
+//
+// 데이터 소스:
+//   - 계좌 1건은 GET /api/v1/accounts/1 + /balance 실제 호출 (REAL 배지)
+//   - 추가 DDA / 정기예금 / 알림은 fixture (DEMO 배지) — 백엔드에 "내 계좌 목록" endpoint 없음
 
 import Link from "next/link";
 import type { Route } from "next";
 import { api, ApiError } from "@/api/client";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
 import { StatusBadge } from "@/components/primitives/StatusBadge";
+import { Donut } from "@/components/primitives/Donut";
+import {
+  FIXTURE_DDA_CARDS,
+  FIXTURE_TIME_DEPOSITS,
+  FIXTURE_NOTIFICATIONS,
+  ASSET_DELTA_FIXTURE,
+  type DashboardCard,
+  type TimeDepositCard,
+  type Notification,
+} from "@/data/dashboard-fixtures";
 import type { AccountState } from "@/lib/tokens";
 
-// 데모 계좌 ID — DemoSeeder 로 시드된 1번 계좌. 실 인증 도입 전까지 단일.
 const DEMO_ACCOUNT_ID = 1;
 
-// 백엔드 AccountResponse 와 BalanceResponse 의 필요 필드 (schema.d.ts 미생성 시 fallback shape).
-// `npm run openapi:gen` 후 src/api/types.ts 의 components["schemas"] 로 대체 권장.
 type AccountResponse = {
   id: number;
   accountNumber: string;
@@ -26,124 +39,298 @@ type AccountResponse = {
 type BalanceResponse = {
   accountId: number;
   accountNumber: string;
-  balance: string;             // 마스킹된 string (PiiMasker.maskAmount)
+  balance: string;        // PiiMasker.maskAmount 의 마스킹 string
   lastTransactionAt: string | null;
 };
 
-type LoadResult =
-  | { ok: true; account: AccountResponse; balance: BalanceResponse }
-  | { ok: false; reason: string };
+type RealCard = DashboardCard & { isFixture?: false };
 
-async function loadDashboard(): Promise<LoadResult> {
+async function loadRealCard(): Promise<{ card: RealCard | null; reason?: string; lastTx: string | null }> {
   try {
     const [account, balance] = await Promise.all([
       api.get<AccountResponse>(`/api/v1/accounts/${DEMO_ACCOUNT_ID}`),
       api.get<BalanceResponse>(`/api/v1/accounts/${DEMO_ACCOUNT_ID}/balance`),
     ]);
-    return { ok: true, account, balance };
+    return {
+      card: {
+        productCode: account.productCode,
+        alias: "주거래 통장",
+        accountNumber: account.accountNumber,
+        status: account.status,
+        // 마스킹 응답에서 숫자 파싱 — 마스킹 형태가 "1,234,567원" 류면 그대로 표시,
+        // 그렇지 않으면 0 처리해 도넛 합산에서 제외.
+        balance: parseMaskedAmount(balance.balance),
+      },
+      lastTx: balance.lastTransactionAt,
+    };
   } catch (e) {
-    if (e instanceof ApiError) return { ok: false, reason: `${e.code} (HTTP ${e.status})` };
-    return { ok: false, reason: e instanceof Error ? e.message : "백엔드 연결 실패" };
+    const reason = e instanceof ApiError ? `${e.code} (HTTP ${e.status})`
+      : e instanceof Error ? e.message : "백엔드 연결 실패";
+    return { card: null, reason, lastTx: null };
   }
 }
 
+function parseMaskedAmount(raw: string): number {
+  // PiiMasker.maskAmount 의 일반적 출력은 "1,234,567원" — 숫자만 추출.
+  const digits = raw.replace(/[^\d]/g, "");
+  return digits ? Number(digits) : 0;
+}
+
 export default async function Page() {
-  const result = await loadDashboard();
+  const real = await loadRealCard();
+  const ddaCards: DashboardCard[] = real.card ? [real.card, ...FIXTURE_DDA_CARDS] : FIXTURE_DDA_CARDS;
+  const tdCards = FIXTURE_TIME_DEPOSITS;
+
+  const ddaSum = ddaCards.filter((c) => c.status === "ACTIVE").reduce((s, c) => s + c.balance, 0);
+  const tdSum = tdCards.reduce((s, c) => s + c.principal + c.accruedInterest, 0);
+  const total = ddaSum + tdSum;
+
+  const isEmpty = ddaCards.length === 0 && tdCards.length === 0;
 
   return (
-    <div className="bg-paper-2 min-h-[calc(100vh-58px)] p-10">
-      <div className="mx-auto max-w-[640px]">
+    <div className="bg-paper-2 min-h-[calc(100vh-58px)]">
+      <div className="mx-auto max-w-[640px] p-6 pb-16">
         <Link href="/" className="font-mono text-[11px] text-ink-3 hover:text-ink">← all screens</Link>
 
         <Eyebrow className="mt-6 mb-3">SCREEN 01 · CUSTOMER · MOBILE</Eyebrow>
-        <h1 className="font-serif text-[40px] leading-[1.1] font-medium tracking-[-0.025em] mb-2">
+        <h1 className="font-serif text-[40px] leading-[1.1] font-medium tracking-[-0.025em] mb-6">
           홍**님, 안녕하세요
         </h1>
 
-        {result.ok ? <Connected account={result.account} balance={result.balance} /> : <Disconnected reason={result.reason} />}
+        {real.reason && <BackendBanner reason={real.reason} />}
 
-        <QuickActions />
+        {isEmpty ? (
+          <EmptyState />
+        ) : (
+          <>
+            <AssetSummary total={total} ddaSum={ddaSum} tdSum={tdSum} />
+            <QuickActions />
+            <DdaList cards={ddaCards} lastTx={real.lastTx} />
+            <TimeDepositList cards={tdCards} />
+            <Notifications items={FIXTURE_NOTIFICATIONS} />
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-function Connected({ account, balance }: { account: AccountResponse; balance: BalanceResponse }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// 자산 요약 + 비율 도넛
+function AssetSummary({ total, ddaSum, tdSum }: { total: number; ddaSum: number; tdSum: number }) {
   return (
-    <section className="mt-8 border border-rule-strong bg-paper p-6">
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <Eyebrow className="mb-1">DDA · {account.productCode}</Eyebrow>
-          <div className="font-mono text-sm text-ink-2 tnum">{account.accountNumber}</div>
+    <section className="border border-rule-strong bg-paper p-6 mb-3 flex items-center gap-6">
+      <Donut
+        parts={[
+          { value: ddaSum, color: "var(--tx-deposit)", label: "DDA" },
+          { value: tdSum,  color: "var(--tx-maturity-payout)", label: "정기예금" },
+        ]}
+      />
+      <div className="flex-1">
+        <Eyebrow className="mb-1">총 자산</Eyebrow>
+        <div className="font-sans tnum font-medium text-[34px] tracking-[-0.02em] leading-none">
+          {total.toLocaleString("ko-KR")}<span className="text-ink-3 font-normal text-base ml-1">원</span>
         </div>
-        <StatusBadge state={account.status} />
-      </div>
-
-      <div className="mb-6">
-        <Eyebrow className="mb-1">잔액</Eyebrow>
-        <div className="font-sans tnum font-medium text-[40px] tracking-[-0.02em]">
-          {balance.balance}
+        <div className="font-mono text-[11px] tnum mt-2 flex items-center gap-1.5">
+          <span style={{ color: "var(--tx-deposit)" }}>
+            {ASSET_DELTA_FIXTURE.trend === "up" ? "▲" : "▼"} {ASSET_DELTA_FIXTURE.amount.toLocaleString("ko-KR")}원
+          </span>
+          <span className="text-ink-3">· 어제 대비 {ASSET_DELTA_FIXTURE.pct}%</span>
+        </div>
+        <div className="mt-3 flex gap-3 text-[11px] font-mono">
+          <Legend color="var(--tx-deposit)" label="DDA" value={ddaSum} />
+          <Legend color="var(--tx-maturity-payout)" label="정기예금" value={tdSum} />
         </div>
       </div>
-
-      <div className="grid grid-cols-2 gap-4 text-sm">
-        <LimitRow label="비대면 한도" value={account.dailyTransferLimit} />
-        <LimitRow label="ATM 한도" value={account.dailyAtmWithdrawLimit} />
-      </div>
-
-      {balance.lastTransactionAt && (
-        <div className="mt-5 pt-4 border-t border-rule font-mono text-[10px] text-ink-3">
-          최근 거래: {new Date(balance.lastTransactionAt).toLocaleString("ko-KR")}
-        </div>
-      )}
     </section>
   );
 }
 
-function LimitRow({ label, value }: { label: string; value: number }) {
+function Legend({ color, label, value }: { color: string; label: string; value: number }) {
   return (
-    <div className="flex justify-between border-t border-rule pt-2">
+    <div className="flex items-center gap-1.5">
+      <span className="w-2 h-2" style={{ background: color }} />
       <span className="text-ink-3">{label}</span>
-      <span className="font-mono tnum">{value.toLocaleString("ko-KR")}원</span>
+      <span className="tnum">{value.toLocaleString("ko-KR")}</span>
     </div>
   );
 }
 
-function Disconnected({ reason }: { reason: string }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// 빠른 액션 4-버튼
+function QuickActions() {
+  const actions: ReadonlyArray<{ label: string; href: Route; icon: string }> = [
+    { label: "입금",    href: "/customer/deposit",  icon: "+" },
+    { label: "출금",    href: "/customer/withdraw", icon: "−" },
+    { label: "이체",    href: "/customer/transfer", icon: "→" },
+    { label: "정기예금", href: "/customer/td-sim",   icon: "%" },
+  ];
   return (
-    <section className="mt-8 border border-rule-strong bg-paper p-8">
-      <Eyebrow className="mb-3">백엔드 연결 실패</Eyebrow>
-      <p className="font-serif text-base text-ink-2 leading-relaxed mb-4">
-        xbank 백엔드(<code className="font-mono text-sm">localhost:8080</code>)에 연결할 수 없습니다.
-      </p>
-      <pre className="font-mono text-[11px] text-ink-3 bg-paper-2 p-3 border border-rule overflow-x-auto">{reason}</pre>
-      <ul className="mt-5 font-mono text-[11px] text-ink-3 space-y-1.5">
-        <li>1. 백엔드 기동: <code className="text-ink">./gradlew bootRun</code></li>
-        <li>2. OpenAPI 명세: <code className="text-ink">curl localhost:8080/v3/api-docs</code></li>
-        <li>3. 타입 재생성: <code className="text-ink">npm run openapi:gen</code></li>
+    <section className="grid grid-cols-4 gap-2 mb-6">
+      {actions.map((a) => (
+        <Link
+          key={a.href}
+          href={a.href}
+          className="border border-rule-strong bg-paper py-4 text-center font-serif hover:bg-paper-2"
+        >
+          <div className="font-mono text-base mb-0.5">{a.icon}</div>
+          <div className="text-xs">{a.label}</div>
+        </Link>
+      ))}
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DDA 카드 리스트
+function DdaList({ cards, lastTx }: { cards: DashboardCard[]; lastTx: string | null }) {
+  return (
+    <section className="mb-6">
+      <Eyebrow className="mb-2">입출금 통장 · {cards.length}</Eyebrow>
+      <ul className="space-y-2">
+        {cards.map((c, i) => (
+          <li key={i} className="border border-rule-strong bg-paper p-4">
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <div className="font-serif text-sm font-medium">{c.alias}</div>
+                <div className="font-mono text-[11px] text-ink-3 tnum mt-0.5">
+                  {c.accountNumber} · {c.productCode}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <SourceBadge isFixture={c.isFixture} />
+                <StatusBadge state={c.status} />
+              </div>
+            </div>
+            <div className="font-sans tnum font-medium text-2xl">
+              {c.balance.toLocaleString("ko-KR")}<span className="text-ink-3 font-normal text-sm ml-1">원</span>
+            </div>
+            {!c.isFixture && lastTx && (
+              <div className="mt-2 font-mono text-[10px] text-ink-3">
+                최근 거래: {new Date(lastTx).toLocaleString("ko-KR")}
+              </div>
+            )}
+          </li>
+        ))}
       </ul>
     </section>
   );
 }
 
-function QuickActions() {
-  const actions: ReadonlyArray<{ label: string; href: Route }> = [
-    { label: "입금",    href: "/customer/deposit" },
-    { label: "출금",    href: "/customer/withdraw" },
-    { label: "이체",    href: "/customer/transfer" },
-    { label: "정기예금", href: "/customer/td-sim" },
-  ];
+// ─────────────────────────────────────────────────────────────────────────────
+// 정기예금 카드 리스트
+function TimeDepositList({ cards }: { cards: TimeDepositCard[] }) {
+  if (cards.length === 0) return null;
   return (
-    <section className="mt-8 grid grid-cols-4 gap-2">
-      {actions.map((a) => (
-        <Link
-          key={a.href}
-          href={a.href}
-          className="border border-rule-strong bg-paper py-4 text-center font-serif text-sm hover:bg-paper-2"
-        >
-          {a.label}
-        </Link>
-      ))}
+    <section className="mb-6">
+      <Eyebrow className="mb-2">정기예금 · {cards.length}</Eyebrow>
+      <ul className="space-y-2">
+        {cards.map((c, i) => {
+          const dDay = daysUntil(c.maturesAt);
+          const total = c.principal + c.accruedInterest;
+          const progress = c.accruedInterest / (c.principal * c.rate / 100);
+          return (
+            <li key={i} className="border border-rule-strong bg-paper p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <div className="font-serif text-sm font-medium">{c.alias}</div>
+                  <div className="font-mono text-[11px] text-ink-3 mt-0.5">
+                    {c.productCode} · 연 {c.rate.toFixed(2)}% · 만기 D-{dDay}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <SourceBadge isFixture={c.isFixture} />
+                  <StatusBadge state={c.status} />
+                </div>
+              </div>
+              <div className="font-sans tnum font-medium text-2xl">
+                {total.toLocaleString("ko-KR")}<span className="text-ink-3 font-normal text-sm ml-1">원</span>
+              </div>
+              <div className="mt-3">
+                <div className="flex justify-between font-mono text-[10px] text-ink-3 mb-1">
+                  <span>이자 누적</span>
+                  <span className="tnum">+{c.accruedInterest.toLocaleString("ko-KR")}원</span>
+                </div>
+                <div className="h-1.5 bg-rule">
+                  <div
+                    className="h-full"
+                    style={{
+                      width: `${Math.min(100, progress * 100)}%`,
+                      background: "var(--tx-maturity-payout)",
+                    }}
+                  />
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function daysUntil(iso: string): number {
+  const target = new Date(iso).getTime();
+  const now = Date.now();
+  return Math.max(0, Math.ceil((target - now) / 86_400_000));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 알림 영역
+function Notifications({ items }: { items: Notification[] }) {
+  if (items.length === 0) return null;
+  return (
+    <section>
+      <Eyebrow className="mb-2">알림 · {items.length}</Eyebrow>
+      <ul className="space-y-2">
+        {items.map((n, i) => (
+          <li key={i} className="border-l-2 border-st-edd-pending bg-paper p-3 pr-4">
+            <div className="font-serif text-sm font-medium mb-0.5">{n.title}</div>
+            <div className="text-xs text-ink-2 leading-relaxed">{n.body}</div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 헬퍼
+function SourceBadge({ isFixture }: { isFixture?: boolean }) {
+  return (
+    <span
+      className="font-mono text-[9px] tracking-[0.06em] uppercase px-1 py-px border"
+      style={{
+        color: isFixture ? "var(--ink-3)" : "var(--accent)",
+        borderColor: isFixture ? "var(--ink-3)" : "var(--accent)",
+      }}
+    >
+      {isFixture ? "demo" : "real"}
+    </span>
+  );
+}
+
+function BackendBanner({ reason }: { reason: string }) {
+  return (
+    <div className="border-l-2 border-st-suspended bg-paper p-3 mb-4">
+      <div className="font-mono text-[11px] tracking-[0.04em] text-ink-3 uppercase mb-1">백엔드 연결 안 됨</div>
+      <div className="text-xs text-ink-2">실 계좌 카드는 표시되지 않습니다 — fixture 만 노출.</div>
+      <pre className="mt-2 font-mono text-[10px] text-ink-3">{reason}</pre>
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <section className="border border-rule-strong bg-paper p-10 text-center">
+      <div className="font-serif text-lg mb-2">아직 계좌가 없어요</div>
+      <p className="text-sm text-ink-2 mb-4">첫 입출금 통장을 만들어 자산 관리를 시작하세요.</p>
+      <Link
+        href={"/customer/signup" as Route}
+        className="inline-block border border-ink bg-ink text-paper px-5 py-2 font-serif text-sm"
+      >
+        DDA 개설하기
+      </Link>
     </section>
   );
 }
