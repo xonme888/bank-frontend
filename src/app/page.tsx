@@ -17,8 +17,9 @@ export default function HubPage() {
             xbank — 계좌·정기예금 뱅킹 시스템의 16 화면.
           </h1>
           <p className="font-serif text-base text-ink-3 max-w-[720px] leading-relaxed m-0">
-            actor / channel / Idempotency / FDS · 한도 가드 / 51 ErrorCode / append-only audit log
-            까지 명세 그대로 화면화. 시니어 백엔드의 도메인 사고를 UI 디테일로 풀어낸 인터랙티브 케이스 스터디.
+            actor·channel·Idempotency, FDS·한도 가드, 51개 ErrorCode, append-only audit log.
+            백엔드가 다루는 도메인 규칙을 UI로 직접 만져볼 수 있는 인터랙티브 케이스 스터디입니다.
+            백엔드 코드는 보안 정책상 비공개이며, 데모는 프론트엔드만 배포되어 일부 인터랙션은 끝까지 동작하지 않습니다.
           </p>
           <div className="flex gap-10 mt-8 flex-wrap">
             {([["16","화면"],["5","도메인"],["3","actor"],["7","channel"],["51","에러 코드"]] as const).map(([v, l]) => (
